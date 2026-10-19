@@ -68,6 +68,17 @@ private final class FakeHubAX: HubAXAccess {
 }
 
 final class DeviceHubAXTests: XCTestCase {
+    func testMessagingTimeoutCoversChildElementsAndFailureIsNotIgnored() throws {
+        var calls = 0
+        try NativeHubAX.configureMessagingTimeout { element, seconds in
+            calls += 1
+            XCTAssertTrue(CFEqual(element, AXUIElementCreateSystemWide()))
+            XCTAssertEqual(seconds, 1)
+            return .success
+        }
+        XCTAssertEqual(calls, 1)
+        XCTAssertThrowsError(try NativeHubAX.configureMessagingTimeout { _, _ in .illegalArgument })
+    }
     func testPrepareSelectsAndReadDoesNotDispatch() throws {
         let ax = FakeHubAX(); ax.row.flags[kAXSelectedAttribute] = false
         XCTAssertEqual(try ax.run("prepare"), "target-confirmed")

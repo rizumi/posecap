@@ -172,7 +172,18 @@ final class NativeHubAX: HubAXAccess {
         guard let bundle = app.bundleURL?.resolvingSymlinksInPath() else { throw ToolError("Device Hub has no application bundle.") }
         self.app = app; self.bundle = bundle; self.cancellation = cancellation
         application = AXUIElementCreateApplication(app.processIdentifier)
-        guard AXUIElementSetMessagingTimeout(application, 1) == .success else { throw ToolError("Cannot set Device Hub Accessibility timeout.") }
+        try Self.configureMessagingTimeout()
+    }
+
+    // A timeout on the application AX object does NOT apply to its children.
+    // The system-wide object sets the default for this client process only,
+    // including newly obtained row, menu and button references.
+    static func configureMessagingTimeout(
+        set: (AXUIElement, Float) -> AXError = AXUIElementSetMessagingTimeout
+    ) throws {
+        guard set(AXUIElementCreateSystemWide(), 1) == .success else {
+            throw ToolError("Cannot set Device Hub Accessibility timeout.")
+        }
     }
 
     private func check() throws {
