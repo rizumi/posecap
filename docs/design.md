@@ -129,10 +129,18 @@ simctl UI Orientation never drives additional rotations. Fold state has no
 GUI readback; the dispatched posture is assumed. Selecting a display from that
 posture does not require active-display readback or populate `activeDisplayID`.
 
-Each invocation gets a new UTC timestamp plus UUID capture directory. It contains
-PNGs and a schema-versioned manifest updated after every image. Labels annotate
-runs; they do not merge or replace them. `report` includes all immediate capture
-subdirectories, sorts them by time, and replaces only generated `index.html`.
+Without `--output`, each invocation gets a new UTC timestamp capture directory
+under `./output`, with numeric suffixes for collisions. Explicit `--output` saves
+directly to that directory. PNG basenames encode the requested posture (when
+present), orientation, and display ID, without sequence numbers. Matching PNGs
+are atomically replaced only after decoding succeeds. Each run replaces the
+schema-versioned manifest and updates it after every image; older and unrelated
+files remain on disk. Labels annotate runs without determining paths.
+`report` reads the input directory's manifest if present; otherwise it includes
+all immediate capture subdirectories, sorting them by time. Only images referenced
+by the current manifests are reported. Capture IDs need not match directory names,
+so directories can be renamed. Legacy captures remain readable. Report generation
+replaces only `index.html`; regenerate it after recapturing.
 Images remain external files. Text is HTML-escaped, image paths are restricted
 to regular PNG basenames within the run, and unknown schemas are rejected.
 

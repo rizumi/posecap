@@ -127,7 +127,7 @@ final class CaptureEngine {
                 for display in captureDisplays {
                     try cancellation.check()
                     do {
-                        let image = try store.image(index: index, display: display) { try simulator.screenshot(device, display: display, to: $0) }
+                        let image = try store.image(condition: result.requested, display: display) { try simulator.screenshot(device, display: display, to: $0) }
                         result.images.append(image)
                     } catch {
                         operationFailed = true

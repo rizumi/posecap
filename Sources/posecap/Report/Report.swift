@@ -11,7 +11,9 @@ enum Report {
     static func generate(input: String, language: ReportLanguage = .en, details: Bool = false, title: String? = nil) throws -> URL {
         let t = ReportText(language: language)
         let root = try SafeFiles.directory(input, create: false)
-        let entries = try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
+        let rootManifest = root.appendingPathComponent("manifest.json")
+        try SafeFiles.rejectSymlinks(in: rootManifest)
+        let entries = FileManager.default.fileExists(atPath: rootManifest.path) ? [root] : try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: [.skipsHiddenFiles])
         var runs: [(Manifest, URL)] = []
         for entry in entries {
             if try SafeFiles.isSymlink(entry) { throw ToolError("Symbolic links are not allowed in report input: \(entry.lastPathComponent).") }
@@ -26,12 +28,11 @@ enum Report {
                 throw ToolError("Unsupported metadata schema in \(entry.lastPathComponent); existing report was not replaced.")
             }
             let manifest = try JSONDecoder().decode(Manifest.self, from: data)
-            guard manifest.captureID == entry.lastPathComponent else { throw ToolError("Capture directory and metadata ID differ.") }
             guard Set(manifest.results.map(\.index)).count == manifest.results.count,
                   Set(manifest.results.map { $0.requested.title }).count == manifest.results.count else { throw ToolError("Duplicate capture conditions in metadata.") }
             runs.append((manifest, entry))
         }
-        guard !runs.isEmpty else { throw ToolError("No capture manifests found directly beneath the input directory.") }
+        guard !runs.isEmpty else { throw ToolError("No capture manifest found in the input directory or its immediate subdirectories.") }
         runs.sort { ($0.0.createdAt, $0.0.captureID) < ($1.0.createdAt, $1.0.captureID) }
         let heading = title ?? t("Capture report", "撮影レポート")
         let labels = Array(Set(runs.map { $0.0.label ?? $0.0.captureID })).sorted()
@@ -55,14 +56,14 @@ enum Report {
             if !manifest.complete { sections += "<p class=failed>\(t("Incomplete run. Pending or interrupted conditions are not successful captures.", "撮影は未完了です。未撮影・中断した条件が含まれています。"))</p>" }
             if details || !manifest.complete { sections += messages(manifest.messages) }
             if manifest.results.contains(where: { $0.requested.isCurrent }) {
-                for result in manifest.results { sections += try cell(result, device: manifest.device, directory: directory, text: t, details: details) }
+                for result in manifest.results { sections += try cell(result, device: manifest.device, directory: directory, reportRoot: root, text: t, details: details) }
             } else {
                 sections += "<div class=grid>"
                 let postures: [Posture?] = manifest.results.contains { $0.requested.posture != nil } ? Posture.allCases.map { $0 } : [nil]
                 for posture in postures where manifest.results.contains(where: { $0.requested.posture == posture }) {
                     for orientation in Orientation.allCases {
                         if let result = manifest.results.first(where: { $0.requested.posture == posture && $0.requested.orientation == orientation }) {
-                            sections += try cell(result, device: manifest.device, directory: directory, text: t, details: details)
+                            sections += try cell(result, device: manifest.device, directory: directory, reportRoot: root, text: t, details: details)
                         } else {
                             let title = t.condition(Condition(posture: posture, orientation: orientation))
                             sections += "<article data-orientation=\"\(orientation.rawValue)\" data-posture=\"\(posture?.rawValue ?? "current")\"><h3>\(escape(title))</h3><p class=muted>\(t("Not requested", "指定なし"))</p></article>"
@@ -135,7 +136,7 @@ enum Report {
         return display.id
     }
 
-    private static func cell(_ result: CaptureResult, device: Device, directory: URL, text t: ReportText, details: Bool) throws -> String {
+    private static func cell(_ result: CaptureResult, device: Device, directory: URL, reportRoot: URL, text t: ReportText, details: Bool) throws -> String {
         let status = t.status(result)
         let style = result.progress == .finished ? result.outcome.rawValue : "failed"
         var html = "<article data-orientation=\"\(result.requested.orientation?.rawValue ?? "current")\" data-posture=\"\(result.requested.posture?.rawValue ?? "current")\"><h3>\(escape(t.condition(result.requested)))</h3>"
@@ -151,7 +152,8 @@ enum Report {
             let file = try SafeFiles.imageURL(image.path, in: directory)
             if let preferred, image.displayID != preferred { continue }
             let componentSet = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-            let relative = [directory.lastPathComponent, file.lastPathComponent].map { $0.addingPercentEncoding(withAllowedCharacters: componentSet)! }.joined(separator: "/")
+            let components = directory == reportRoot ? [file.lastPathComponent] : [directory.lastPathComponent, file.lastPathComponent]
+            let relative = components.map { $0.addingPercentEncoding(withAllowedCharacters: componentSet)! }.joined(separator: "/")
             let role = preferred == image.displayID ? (result.requested.posture == .closed ? t("Outer display · ", "外側の画面 · ") : t("Inner display · ", "内側の画面 · ")) : ""
             let caption = "\(role)\(t("Display", "画面")) \(image.displayID) · PNG \(image.width) × \(image.height)"
             let figure = "<figure><a href=\"\(escape(relative))\"><img loading=lazy src=\"\(escape(relative))\" alt=\"\(escape(caption))\"></a>" + (details || preferred == nil && result.images.count > 1 ? "<figcaption>\(escape(caption))</figcaption>" : "") + "</figure>"

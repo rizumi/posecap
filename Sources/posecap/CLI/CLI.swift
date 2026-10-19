@@ -49,7 +49,7 @@ enum CLI {
                 "xcode": try runner.run("/usr/bin/xcodebuild", ["-version"], timeout: 30).text.trimmingCharacters(in: .whitespacesAndNewlines),
                 "tool": version,
             ]
-            let store = try CaptureStore(root: options.output)
+            let store = try CaptureStore(root: options.output ?? "./output", direct: options.output != nil)
             print("Capture: \(store.directory.path)")
             let controller = DeviceHubController(simulator: simulator, runner: runner)
             let engine = CaptureEngine(simulator: simulator, controller: controller, cancellation: cancellation)

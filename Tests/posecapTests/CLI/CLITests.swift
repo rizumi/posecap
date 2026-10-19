@@ -21,7 +21,8 @@ final class CLITests: XCTestCase {
         ]) as? CaptureCommand)
         XCTAssertEqual(capture.model, "iPhone Duo")
         XCTAssertEqual(capture.label, "Home")
-        XCTAssertEqual(capture.output, "./output")
+        XCTAssertNil(capture.output)
+        XCTAssertEqual(try CaptureCommand.parse(["--output", "./screenshots/home"]).output, "./screenshots/home")
         let id = "abcdefab-0000-0000-0000-000000000001"
         XCTAssertEqual(try CaptureCommand.parse(["--udid", id]).udid, id.uppercased())
         for args in [
