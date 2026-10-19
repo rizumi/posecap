@@ -31,7 +31,9 @@ or Portrait / Landscape. GitHub displays the HTML source rather than the report.
 `--current` captures without GUI control and does not require Device Hub 27.1
 or those permissions.
 
-## Install with mise
+## Install
+
+### mise
 
 The release archive supports Apple Silicon Macs (arm64) and includes the
 Device Hub resource bundle. Xcode is still required for Simulator capture.
@@ -48,6 +50,23 @@ To list available releases:
 ```sh
 mise ls-remote github:rizumi/posecap
 ```
+
+### Build from source
+
+Build from the repository using the selected Xcode toolchain:
+
+```sh
+swift build -c release
+.build/release/posecap --help
+swift test
+```
+
+The executable needs the adjacent SwiftPM resource bundle; copying the executable
+alone is not supported. There are no third-party package dependencies.
+
+Maintainers can run `bash scripts/package-release.sh` on an Apple Silicon Mac
+to build an archive and SHA-256 checksum in `dist/`. The archive keeps
+`bin/posecap` beside `bin/posecap_CaptureCore.bundle` and includes the license.
 
 ## Use
 
@@ -140,23 +159,6 @@ paths; exclude custom output directories yourself.
 
 See [design decisions](docs/design.md) for verification rules, storage details,
 timeouts, and validation results.
-
-## Build from source
-
-Build from the repository using the selected Xcode toolchain:
-
-```sh
-swift build -c release
-.build/release/posecap --help
-swift test
-```
-
-The executable needs the adjacent SwiftPM resource bundle; copying the executable
-alone is not supported. There are no third-party package dependencies.
-
-Maintainers can run `bash scripts/package-release.sh` on an Apple Silicon Mac
-to build an archive and SHA-256 checksum in `dist/`. The archive keeps
-`bin/posecap` beside `bin/posecap_CaptureCore.bundle` and includes the license.
 
 ## License
 
