@@ -20,10 +20,12 @@ source is in [docs/example](docs/example).
 - An Apple Silicon Mac with macOS 26.0 or later and Xcode. Intel Macs are not supported.
 - A booted iPhone or iPad Simulator with the app screen ready to capture.
 - Device Hub 27.1 from the selected Xcode,
-  with its device window and sidebar accessible, plus Accessibility and
-  Automation permissions for the launching terminal or app.
+  with its device window and sidebar accessible, plus Accessibility
+  permission for the launching terminal/app or the `posecap` executable.
 
 Capture requires an interactive desktop; do not interact with Device Hub during capture.
+GUI control uses native macOS Accessibility APIs. Direction operations still bring
+Device Hub to the foreground; background capture is not supported.
 
 Tested with macOS 26.6.2, Xcode 27.1 (27A9275), and Swift 6.4.
 
@@ -50,8 +52,7 @@ swift build -c release
 export PATH="$PWD/.build/release:$PATH"
 ```
 
-Keep the executable beside its SwiftPM resource bundle; copying the executable
-alone is not supported.
+The executable is self-contained; no SwiftPM resource bundle is required.
 
 ## Usage
 

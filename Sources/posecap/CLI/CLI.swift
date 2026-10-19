@@ -51,7 +51,7 @@ enum CLI {
             ]
             let store = try CaptureStore(root: options.output ?? "./output", direct: options.output != nil)
             print("Capture: \(store.directory.path)")
-            let controller = DeviceHubController(simulator: simulator, runner: runner)
+            let controller = DeviceHubController(simulator: simulator, runner: runner, cancellation: cancellation)
             let engine = CaptureEngine(simulator: simulator, controller: controller, cancellation: cancellation)
             let code: Int32
             do {

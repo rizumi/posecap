@@ -16,7 +16,10 @@ final class DeviceHubController: DeviceControlling {
     private let simulator: Simulator
     private let runner: CommandRunning
     private var expectedBundle: URL?
-    init(simulator: Simulator, runner: CommandRunning) { self.simulator = simulator; self.runner = runner }
+    private let cancellation: Cancellation
+    init(simulator: Simulator, runner: CommandRunning, cancellation: Cancellation) {
+        self.simulator = simulator; self.runner = runner; self.cancellation = cancellation
+    }
 
     func prepare(_ device: Device, conditions: [Condition]) throws {
         let developer = try runner.run("/usr/bin/xcode-select", ["-p"], timeout: 30).text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -43,11 +46,13 @@ final class DeviceHubController: DeviceControlling {
         }
     }
 
-    private func validateProcess() throws {
+    @discardableResult
+    private func validateProcess() throws -> NSRunningApplication {
         let apps = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dt.Devices")
         guard apps.count == 1, let actual = apps.first?.bundleURL?.resolvingSymlinksInPath(), actual == expectedBundle else {
             throw ToolError("Open exactly one Device Hub from the selected Xcode before GUI capture.")
         }
+        return apps[0]
     }
 
     private func validateTargetEnvironment(_ device: Device) throws {
@@ -81,8 +86,7 @@ final class DeviceHubController: DeviceControlling {
     }
 
     func readOrientation(_ device: Device) throws -> DeviceOrientation? {
-        // The adapter checks selection/title within each operation. A separate
-        // "check" subprocess would repeat that same AX traversal immediately.
+        // Each fresh AX session checks selection/title within the operation.
         try validateTargetEnvironment(device)
         let value = try response(device, operation: "read-orientation", control: "")
         if value == "unknown" { return nil }
@@ -97,8 +101,15 @@ final class DeviceHubController: DeviceControlling {
     }
 
     private func response(_ device: Device, operation: String, control: String) throws -> String {
-        guard let script = Bundle.module.url(forResource: "DeviceHub", withExtension: "applescript") else { throw ToolError("Missing Device Hub adapter resource.") }
-        let output = try runner.run("/usr/bin/osascript", [script.path, device.name, device.runtimeVersion, operation, control], timeout: 30)
-        return output.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            if ProcessInfo.processInfo.environment["POSECAP_TRACE_TIMING"] == "1" {
+                let elapsed = String(format: "%.3f", ProcessInfo.processInfo.systemUptime - started)
+                let suffix = control.isEmpty ? "" : " " + control
+                FileHandle.standardError.write(Data("[timing] \(elapsed)s Device Hub AX \(operation)\(suffix)\n".utf8))
+            }
+        }
+        let access = try NativeHubAX(app: validateProcess(), cancellation: cancellation)
+        return try DeviceHubAX(access: access).run(device: device, operation: operation, control: control)
     }
 }
