@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 enum CLI {
-    static let version = "0.1.2"
+    static let version = "0.1.3"
 
     static func run(arguments: [String]) -> Int32 {
         var command: any ParsableCommand

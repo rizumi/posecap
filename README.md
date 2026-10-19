@@ -35,7 +35,7 @@ Tested with macOS 26.6.2, Xcode 27.1 RC (27A9275), and Swift 6.4.
 With [mise](https://mise.jdx.dev/getting-started.html) installed and activated:
 
 ```sh
-mise use -g github:rizumi/posecap@0.1.2
+mise use -g github:rizumi/posecap@0.1.3
 ```
 
 Release binaries support Apple Silicon Macs (arm64).
