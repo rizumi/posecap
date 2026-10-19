@@ -36,34 +36,18 @@ or those permissions.
 The release archive supports Apple Silicon Macs (arm64) and includes the
 Device Hub resource bundle. Xcode is still required for Simulator capture.
 Install [mise](https://mise.jdx.dev/getting-started.html) and activate it in your
-shell.
-
-While this repository is private, authenticate first using
-[GitHub CLI](https://cli.github.com/) with an account that can read it:
+shell, then install posecap:
 
 ```sh
-gh auth login --hostname github.com
-mise settings set github.credential_command 'gh auth token --hostname github.com'
-```
-
-Alternatively, supply `MISE_GITHUB_TOKEN` with access to this repository
-(Contents: read for a fine-grained token). Then install posecap:
-
-```sh
-MISE_USE_VERSIONS_HOST=0 mise use -g github:rizumi/posecap@0.1.0
+mise use -g github:rizumi/posecap@0.1.0
 posecap --version
 ```
 
-`MISE_USE_VERSIONS_HOST=0` queries GitHub directly instead of mise's shared
-version service. To list releases:
+To list available releases:
 
 ```sh
-MISE_USE_VERSIONS_HOST=0 mise ls-remote github:rizumi/posecap
+mise ls-remote github:rizumi/posecap
 ```
-
-See [mise authentication](https://mise.jdx.dev/dev-tools/github-tokens.html)
-for other authentication options. Releases inherit the repository's visibility;
-this installation method does not register posecap in mise's public registry.
 
 ## Use
 
