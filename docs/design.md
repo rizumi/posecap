@@ -26,7 +26,6 @@ Directories group related responsibilities within that module:
 - `Simulator`: device models, discovery, simctl, and Device Hub control.
 - `Report`: offline HTML generation and localization.
 - `Support`: subprocess execution, file checks, and shared errors.
-- `Resources`: the bundled Device Hub AppleScript adapter.
 
 Argument Parser integration stays in `CLI`; capture planning operates on
 device and posture types independently of command-line parsing. Tests follow
@@ -45,7 +44,7 @@ Fail closed if the selected Simulator or GUI control cannot be identified
 unambiguously. Use semantic control labels and discover display IDs at runtime;
 avoid positional button selectors and hard-coded screen IDs.
 
-Document macOS Accessibility and Automation permissions, Device Hub availability,
+Document macOS Accessibility permissions, Device Hub availability,
 UI-language requirements, and tested Xcode versions. GUI automation is subject
 to Xcode UI changes; capability discovery must not claim unknown support as
 supported or unsupported.
@@ -157,26 +156,35 @@ displays.
 ## Implementation boundaries
 
 `Inventory` and `Options` select targets and plan conditions. `Simulator` wraps
-simctl. `DeviceControlling` isolates Device Hub and its AppleScript resource.
+simctl. `DeviceControlling` isolates Device Hub control. `DeviceHubAX` implements
+the 27.1 UI traversal against a small access interface, with `NativeHubAX` using
+public macOS Accessibility APIs. Tests supply a fake AX tree.
 `CaptureEngine` sequences operations and checkpoints metadata. `CaptureStore`
 owns output creation and PNG decoding. `Report` only reads saved artifacts.
 `ProcessRunner` uses argument arrays, bounded output files, cancellation, and
 deadlines; it never constructs shell commands from labels or device names.
 
 GUI operations validate the running Device Hub and Simulator inventory, then
-check the selected target inside the operation's AppleScript. They do not run
-an additional standalone AX target-check subprocess immediately beforehand.
+check the selected target within a fresh native AX session. No AppleScript or
+System Events subprocess is involved. Inventory checks are retained.
 Explicit checks before capture and the adapter's checks around mutations remain
 in place. After capture, orientation readback also checks target identity, so a
-separate target-check subprocess is needed only for posture-only conditions.
-Each AppleScript operation resolves a unique sidebar row once, then rechecks
+separate target check is needed only for posture-only conditions.
+Each AX operation resolves a unique sidebar row once, then rechecks
 that row and the window title around actions. Row references never survive an
 operation. Display enumeration records the state before changes, immediately
 before images, and after images.
 
 ## Timing, failures, and exit codes
 
-External commands have 30-second deadlines, with a 25-second Apple-event timeout.
+External commands have 30-second deadlines. Each native AX session has a
+25-second operation deadline and a one-second AX messaging timeout. Cancellation,
+process identity and the operation deadline are checked between AX calls; a
+blocked AX call can delay cancellation until its messaging timeout. Unknown
+completion or AX transport errors stop the operation. Missing dynamic menu
+structure fails instead of reusing stale references. Menu operations still
+activate Device Hub and check its foreground state via AXFrontmost; native AX
+does not enable background capture.
 GUI mutations settle for at least four seconds. Each orientation uses at most
 two left/right turns driven only by GUI menu readback, with one named request
 allowed first when no planar orientation is available or a posture dispatch leaves
@@ -187,7 +195,7 @@ application readiness or animation completion; posecap does not launch apps or
 verify application responsiveness.
 
 Completed conditions print elapsed seconds. `POSECAP_TRACE_TIMING=1` writes
-per-command durations to stderr, including failed commands, without device UUIDs
+per-command and native AX operation durations to stderr, including failed commands, without device UUIDs
 or output paths. This separates GUI and simctl overhead from settling waits.
 Controls exposes both Rotate Left and Rotate Right even though the observed
 toolbar exposes only Rotate Right. Both menu items are checked during preparation.
@@ -230,7 +238,7 @@ adapter assumptions, not Simulator API guarantees.
   advances Portrait → Landscape Right → Portrait Upside Down → Landscape Left;
   Rotate Left reverses that order.
 - A full per-element attribute walk is too slow for routine use. Prefer bounded,
-  scoped reads with deadlines on both inspection and action subprocesses.
+  scoped reads with deadlines on both inspection and actions.
 
 Reference implementations provide useful context without being dependencies:
 

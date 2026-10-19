@@ -11,8 +11,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "posecap",
-            dependencies: [.product(name: "ArgumentParser", package: "swift-argument-parser")],
-            resources: [.copy("Resources/DeviceHub.applescript")]
+            dependencies: [.product(name: "ArgumentParser", package: "swift-argument-parser")]
         ),
         .testTarget(name: "posecapTests", dependencies: ["posecap"]),
     ]

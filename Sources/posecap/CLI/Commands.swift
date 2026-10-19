@@ -68,7 +68,7 @@ struct CaptureCommand: ParsableCommand {
         discussion: """
         Defaults to all postures/orientations: six for Duo, two for other models.
         Requires a booted Simulator; select one if several are booted.
-        GUI changes require Device Hub 27.1 and Accessibility/Automation access.
+        GUI changes require Device Hub 27.1 and Accessibility access.
         Final posture/orientation is left in place. Completed captures exit 0.
         """)
 
