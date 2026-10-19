@@ -1,77 +1,78 @@
 # posecap
 
-A Swift CLI for capturing the currently displayed iOS Simulator screen across
-device postures and orientations, with a static HTML report for visual review.
-You open the screen to inspect; posecap handles capture and reporting. It does
-not build, install, or navigate apps.
+Capture iOS Simulator screenshots across device postures and orientations,
+then compare them in an offline HTML report.
 
-**Status:** experimental. iPad capture and reports have been validated.
-iPhone Duo posture verification and orientation changes remain limited;
-see [Known limitations](#known-limitations).
+Open the app screen you want to capture; posecap handles the screenshots and
+report. It does not build, install, or navigate apps.
+
+**Experimental:** iPad capture and reports have been validated. iPhone Duo
+posture verification and orientation changes have
+[known limitations](#known-limitations).
 
 [![DayTrip capture report on iPhone Duo](docs/images/daytrip-preview.png)](docs/example/index.html)
 
-The [example report](docs/example) contains two screens captured in six
-posture/orientation combinations each on iPhone Duo. After cloning the
-repository, run `open docs/example/index.html` to view it and filter by screen
-or Portrait / Landscape. GitHub displays the HTML source rather than the report.
+The [example report](docs/example) shows two screens in six posture/orientation
+combinations on iPhone Duo. After cloning the repository, run
+`open docs/example/index.html` to view it. GitHub displays the HTML source.
 
 ## Requirements
 
-- macOS 26.0 or later and Xcode. Tested with macOS 26.6.2,
-  Xcode 27.1 RC (27A9275), and Swift 6.4.
-- A booted iPhone or iPad Simulator with the desired app screen already open.
-- Posture and orientation changes require Device Hub 27.1 from the selected
-  Xcode; other Device Hub versions are rejected. It must be running with its
-  device window and sidebar accessible. Allow the launching terminal or app
-  Accessibility access and Automation access to System Events and Device Hub
-  in macOS Privacy & Security settings. GUI control requires an interactive
-  desktop; do not interact with Device Hub during a capture.
+- macOS 26.0 or later and Xcode.
+- A booted iPhone or iPad Simulator with the app screen ready to capture.
+- For posture and orientation changes: Device Hub 27.1 from the selected Xcode,
+  running with its device window and sidebar accessible. Other versions are
+  rejected.
+
+GUI control requires an interactive desktop and Accessibility and Automation
+permissions for the launching terminal or app. In macOS Privacy & Security,
+allow access to System Events and Device Hub when prompted. Do not interact
+with Device Hub during capture.
 
 `--current` captures without GUI control and does not require Device Hub 27.1
 or those permissions.
+
+Tested with macOS 26.6.2, Xcode 27.1 RC (27A9275), and Swift 6.4.
 
 ## Install
 
 ### mise
 
-The release archive supports Apple Silicon Macs (arm64) and includes the
-Device Hub resource bundle. Xcode is still required for Simulator capture.
-Install [mise](https://mise.jdx.dev/getting-started.html) and activate it in your
-shell, then install posecap:
+With [mise](https://mise.jdx.dev/getting-started.html) installed and activated
+in your shell:
 
 ```sh
 mise use -g github:rizumi/posecap@0.1.0
 posecap --version
 ```
 
-To list available releases:
-
-```sh
-mise ls-remote github:rizumi/posecap
-```
+Release binaries support Apple Silicon Macs (arm64) and include the required
+resource bundle. Xcode is still required for Simulator capture. Use
+`mise ls-remote github:rizumi/posecap` to list available versions.
 
 ### Build from source
 
-Build from the repository using the selected Xcode toolchain:
-
 ```sh
+git clone https://github.com/rizumi/posecap.git
+cd posecap
 swift build -c release
 .build/release/posecap --help
-swift test
 ```
 
-The executable needs the adjacent SwiftPM resource bundle; copying the executable
+To use `posecap` directly in the current shell:
+
+```sh
+export PATH="$PWD/.build/release:$PATH"
+```
+
+Keep the executable beside its SwiftPM resource bundle; copying the executable
 alone is not supported. There are no third-party package dependencies.
 
-Maintainers can run `bash scripts/package-release.sh` on an Apple Silicon Mac
-to build an archive and SHA-256 checksum in `dist/`. The archive keeps
-`bin/posecap` beside `bin/posecap_CaptureCore.bundle` and includes the license.
+## Usage
 
-## Use
+### Capture the current screen
 
-With exactly one eligible Simulator booted, capture its current screen and
-create a report:
+With one eligible Simulator booted:
 
 ```sh
 posecap devices
@@ -80,85 +81,118 @@ posecap report --input ./output
 open ./output/index.html
 ```
 
-To capture across iPhone Duo postures and orientations, or select one condition:
+`--current` saves the screen without changing posture or orientation.
+
+### Capture postures and orientations
+
+Capture all six iPhone Duo combinations, or select a single condition:
 
 ```sh
 posecap capture --model "iPhone Duo" --label Home
 posecap capture --model "iPhone Duo" --posture closed --orientation portrait
 ```
 
-Select a device with `--model` (an exact device-type model name) or `--udid`
-(a UUID from `devices`), but not both. Without either, exactly one eligible
-Simulator must be booted. posecap never boots devices or launches apps.
+Without condition filters, iPhone Duo captures all three postures in portrait
+and landscape. Other iPhone/iPad models capture portrait and landscape only.
 
-## Capture options
+Select a Simulator by its exact model name with `--model`, or by a UUID from
+`posecap devices` with `--udid`. These options are mutually exclusive. Without
+one, exactly one eligible Simulator must be booted.
 
-| Option | Behavior |
+### Capture options
+
+| Option | Description |
 | --- | --- |
-| No condition filters | All three postures on iPhone Duo; portrait and landscape for each. Other iPhone/iPad models use portrait and landscape only. |
-| `--posture closed\|half-open\|open` | Limit to one posture (iPhone Duo only). |
-| `--orientation portrait\|landscape` | Limit to one orientation. Combine with `--posture` for one condition. |
-| `--current` | Capture without changing posture or orientation; cannot be combined with condition filters. |
-| `--label TEXT` | Screen name used by the report filter; repeated labels remain separate runs. |
-| `--output PATH` | Save results under this directory (default: `./output`). |
+| `--model NAME` | Select a booted Simulator by exact device-type model name. |
+| `--udid UUID` | Select a booted Simulator by UUID. |
+| `--current` | Capture without GUI changes. Cannot be combined with posture or orientation filters. |
+| `--posture closed\|half-open\|open` | Capture one posture (iPhone Duo only). |
+| `--orientation portrait\|landscape` | Capture one orientation. Can be combined with `--posture`. |
+| `--label TEXT` | Set the screen name shown in the report. Repeated labels remain separate runs. |
+| `--output PATH` | Set the output directory (default: `./output`). |
 
 Landscape means landscape-left. Half-open uses Device Hub's **Partially Open**
-preset, without assuming a hinge angle. The final posture and orientation are
-left in place; there is no automatic restoration.
+preset without assuming a hinge angle. The final posture and orientation are
+left in place.
 
-## Results and reports
+### Generate a report
 
-Each capture creates a new directory containing PNGs and `manifest.json`.
-Partial captures retain saved files. For iPhone Duo posture captures, the
-report defaults to the outer screen for Closed and the inner screen for
-Partially folded / Fully open; the other saved display is omitted. If the display mapping
-or requested posture is unavailable, it shows all saved displays. Failed,
-mismatched, and incomplete captures remain visible. Capture diagnostics are
-hidden by default; add `--details` when generating a report to include them.
+```sh
+posecap report --input ./output --title "My App" --language en
+```
 
-`report --input ./output` combines the capture directories into `index.html`.
-Add `--language ja` for Japanese or `--language en` for English (the default).
-Use `--title "My App"` for the app name; capture `--label` values identify
-screens in the filter. For example:
-`posecap report --input ./output --title "My App" --language ja`.
-Only the generated HTML is replaced; images and manifests are retained. Open
-it locally and keep the capture directories alongside it when sharing. The
-report works offline, with a small embedded script for instant screen and
-orientation filters. With JavaScript disabled, all captures remain visible.
-Results include Simulator identifiers and display names, so review them before
-sharing. The bundled example uses an anonymized Simulator ID and readable
-directory names (`spot-detail` and `itinerary`).
+The report combines capture runs into `index.html`, with filters for screen
+labels and orientations. Use `--language ja` for Japanese and `--details` to
+include capture diagnostics. English is the default.
 
-| Exit code | Meaning |
+For iPhone Duo, the report shows the outer screen for Closed and the inner
+screen for Partially folded / Fully open. This is a presentation default,
+not verification of the active display. Both images remain saved; if the
+posture or display mapping is unavailable, all saved displays are shown.
+Failed, mismatched, and incomplete captures retain visible status messages.
+
+Run `posecap --help` for the command reference.
+
+## Output
+
+Each capture creates a new directory under `--output` containing PNG files and
+`manifest.json`. Saved files are retained if a capture stops partway through.
+Generating a report replaces only `index.html`; images and manifests are kept.
+
+Reports work offline. Keep the capture directories alongside `index.html` when
+sharing. Without JavaScript, all captures remain visible. Results include
+Simulator identifiers and display names, so review them before sharing.
+
+The default output directory and logs are ignored by Git. Add custom output
+directories to your own ignore rules.
+
+## Exit codes
+
+| Code | Meaning |
 | --- | --- |
-| 0 | All capture conditions verified, or another command completed successfully |
-| 1 | GUI preparation failed, or capture has unverified, mismatched, failed, interrupted, or unattempted conditions |
-| 2 | Argument, device selection, other setup, or report-generation error |
+| `0` | All capture conditions verified, or another command completed successfully. |
+| `1` | GUI preparation failed, or capture contains unverified, mismatched, failed, interrupted, or unattempted conditions. |
+| `2` | Argument, device selection, other setup, or report-generation error. |
 
-A successfully generated report can describe failed captures and still exit 0.
-Generated results and logs are excluded from version control at the default
-paths; exclude custom output directories yourself.
+Report generation can succeed with exit code `0` even when the report contains
+failed captures.
 
 ## Known limitations
 
-- iPhone Duo posture and active-panel selection cannot currently be verified.
-  Multiple built-in displays are all saved and marked unverified, even when
-  the images look correct. Unverified captures exit nonzero.
-- With Xcode 27.1 RC, half-open and open iPhone Duo captures can report an
-  orientation mismatch after a named direction is selected. posecap checks the
-  GUI readback and tries up to three right rotations to reach the requested
-  direction. If it cannot confirm the direction, it stops before taking that
+- **iPhone Duo verification:** posture and active-panel selection cannot
+  currently be verified. Both built-in displays are saved and captures remain
+  unverified, even when the images look correct. Unverified captures exit `1`.
+- **Orientation changes:** with Xcode 27.1 RC, half-open and open iPhone Duo
+  captures can report a different orientation after a named direction is
+  selected. posecap checks GUI readback and tries up to three right rotations.
+  If it cannot confirm the requested direction, it stops before taking that
   screenshot and records the reason.
-- Verified orientation describes Device Hub's reported state, not whether the
-  app rotated its layout. Apps may restrict rotation.
-- Capture does not verify app responsiveness. Open the intended screen and
-  confirm it responds before starting a capture.
-- The GUI adapter has been tested only with the Xcode build above and English
-  control labels. Other builds, languages, and live capture on single-screen
-  iPhones have not been verified.
+- **App behavior:** verified orientation describes Device Hub's reported state,
+  not whether the app rotated its layout. Apps may restrict rotation. posecap
+  does not verify responsiveness; check the app before starting a capture.
+- **Compatibility:** GUI control has been tested only with the Xcode build
+  listed above and English control labels. Other builds, languages, and live
+  capture on single-screen iPhones have not been verified.
+
+## Development
+
+Run the automated tests:
+
+```sh
+swift test
+```
+
+Build a release archive and SHA-256 checksum in `dist/` on an Apple Silicon Mac:
+
+```sh
+bash scripts/package-release.sh
+```
+
+The archive includes `bin/posecap`, the adjacent
+`bin/posecap_CaptureCore.bundle`, and `LICENSE`.
 
 See [design decisions](docs/design.md) for verification rules, storage details,
-timeouts, and validation results.
+and timeouts.
 
 ## License
 
