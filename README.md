@@ -19,12 +19,11 @@ To view the [example report](docs/example), clone the repository and run
 
 - macOS 26.0 or later and Xcode.
 - A booted iPhone or iPad Simulator with the app screen ready to capture.
-- For posture and orientation changes: Device Hub 27.1 from the selected Xcode,
+- Device Hub 27.1 from the selected Xcode,
   with its device window and sidebar accessible, plus Accessibility and
   Automation permissions for the launching terminal or app.
 
-`--current` does not require Device Hub or GUI permissions. GUI control requires
-an interactive desktop; do not interact with Device Hub during capture.
+Capture requires an interactive desktop; do not interact with Device Hub during capture.
 
 Tested with macOS 26.6.2, Xcode 27.1 RC (27A9275), and Swift 6.4.
 
@@ -54,12 +53,12 @@ alone is not supported.
 
 ## Usage
 
-With one Simulator booted, capture the current screen without changing its
-posture or orientation, then open the report:
+With one Simulator booted, capture the prepared app across postures and
+orientations, then open the report:
 
 ```sh
 posecap devices
-posecap capture --current --label Home
+posecap capture --label Home
 posecap report --input ./output
 open ./output/index.html
 ```
@@ -72,7 +71,7 @@ posecap capture --model "iPhone Duo" --label Home
 
 For iPhone Duo, capture saves the outer display when closed and the inner
 display when partially folded or fully opened: one image per condition.
-With `--current` or an unknown display mapping, it saves all built-in displays.
+With an unknown display mapping, it saves all built-in displays.
 
 Use `--posture` and `--orientation` to select a single condition:
 

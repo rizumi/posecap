@@ -55,7 +55,16 @@ final class ReportTests: XCTestCase {
         for condition in [Condition(posture: .closed, orientation: .portrait), Condition()] {
             let store = try CaptureStore(root: root.path)
             let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: FakeController(), cancellation: Cancellation(), settleSeconds: 0)
-            XCTAssertEqual(try engine.capture(device: device(), conditions: [condition], label: nil, store: store, environment: [:]), 0)
+            XCTAssertEqual(try engine.capture(device: device(), conditions: [condition.isCurrent ? Condition(orientation: .portrait) : condition], label: nil, store: store, environment: [:]), 0)
+            if condition.isCurrent {
+                var legacy = try readManifest(store)
+                var result = CaptureResult(index: 0, requested: Condition())
+                result.images = legacy.results[0].images
+                result.progress = .finished
+                result.outcome = .captured
+                legacy.results = [result]
+                try store.save(legacy)
+            }
         }
         let output = try Report.generate(input: root.path)
         let html = try String(contentsOf: output, encoding: .utf8)
@@ -135,7 +144,7 @@ final class ReportTests: XCTestCase {
         for _ in 0..<2 {
             let store = try CaptureStore(root: root.path); first = first ?? store
             let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: FakeController(), cancellation: Cancellation(), settleSeconds: 0)
-            _ = try engine.capture(device: device(), conditions: [Condition()], label: label, store: store, environment: [:])
+            _ = try engine.capture(device: device(), conditions: [Condition(orientation: .portrait)], label: label, store: store, environment: [:])
         }
         let output = try Report.generate(input: root.path)
         let html = try String(contentsOf: output, encoding: .utf8)
@@ -143,7 +152,7 @@ final class ReportTests: XCTestCase {
         XCTAssertEqual(html.components(separatedBy: "<script>").count - 1, 1)
         XCTAssertTrue(html.contains("script-src 'sha256-"))
         XCTAssertEqual(html.components(separatedBy: "<option value=\"0\">&lt;script&gt;").count - 1, 1)
-        XCTAssertTrue(html.contains("data-orientation=\"current\""))
+        XCTAssertTrue(html.contains("data-orientation=\"portrait\""))
         XCTAssertEqual(html.components(separatedBy: "<h2>&lt;script&gt;").count - 1, 2)
         let store = first!
         var manifest = try readManifest(store)

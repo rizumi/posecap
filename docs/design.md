@@ -89,14 +89,15 @@ inventory, including shutdown devices, and a matching selected GUI row and title
 The default matrix is closed/portrait, closed/landscape, half-open/portrait,
 half-open/landscape, open/portrait, open/landscape for iPhone Duo; other iPhone/iPad
 models use portrait and landscape. Landscape is left. Posture/orientation filters
-narrow this matrix. `--current` captures without mutations and excludes filters.
+narrow this matrix. Every new capture uses explicit conditions from this matrix.
+Current-state capture is not supported; use Device Hub for ad hoc screenshots.
 Half-open refers to the GUI preset, not a measured angle. No restoration occurs.
 
 Only built-in displays are captured. When one is listed it is the sole eligible
 display. For iPhone Duo with stable, recognized display roles, capture saves only
 the outer display for closed posture and the inner display for half-open/open.
 This selects a target from the requested posture; it does not verify which panel
-is active. Current-state captures, unknown/ambiguous/changing role mappings, and
+is active. Unknown/ambiguous/changing role mappings and
 other models retain all built-in displays. Display IDs are resolved at runtime;
 image brightness and power state do not drive selection. Both display inventories
 remain in the manifest even when only one image is saved.
@@ -163,8 +164,7 @@ separate target-check subprocess is needed only for posture-only conditions.
 Each AppleScript operation resolves a unique sidebar row once, then rechecks
 that row and the window title around actions. Row references never survive an
 operation. Display enumeration records the state before changes, immediately
-before images, and after images; current-state capture reuses the initial
-enumeration for the pre-image state.
+before images, and after images.
 
 ## Timing, failures, and exit codes
 
@@ -248,7 +248,7 @@ New posture-based captures save only the selected display. Existing captures
 with both images remain readable and show the same preferred image. No
 alternate-display viewer or dual-display mode is implemented. Unknown
 or ambiguous roles, changing role mappings, a missing preferred image, other
-models, or a current-state capture without requested posture fall back to
+models, or a legacy current-state capture without requested posture fall back to
 showing all saved images. Labels are never parsed to infer posture.
 
 Report generation does not establish the active display, modify the manifest,
@@ -297,7 +297,7 @@ The initial view includes every screen, posture, and orientation. Native select
 controls combine all three filters on the saved cards. The posture filter appears
 when at least one run requests a posture and includes Closed, Partially folded,
 and Fully opened. Mixed reports include a Current / unspecified posture option;
-current captures also have an unspecified orientation option. Unrequested cards
+legacy current captures also have an unspecified orientation option. Unrequested cards
 carry the same posture and orientation fields as captured cards. No posture or
 orientation is inferred from image dimensions.
 

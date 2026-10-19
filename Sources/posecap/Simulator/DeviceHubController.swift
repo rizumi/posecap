@@ -23,7 +23,7 @@ final class DeviceHubController: DeviceControlling {
         let app = URL(fileURLWithPath: developer).deletingLastPathComponent().appendingPathComponent("Applications/DeviceHub.app")
         guard let bundle = Bundle(url: app), bundle.bundleIdentifier == "com.apple.dt.Devices",
               bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String == "27.1" else {
-            throw ToolError("GUI control is implemented only for Device Hub 27.1. Select a matching Xcode or use --current.")
+            throw ToolError("GUI control is implemented only for Device Hub 27.1. Select a matching Xcode.")
         }
         expectedBundle = app.resolvingSymlinksInPath()
         try validateProcess()

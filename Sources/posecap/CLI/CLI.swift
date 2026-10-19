@@ -41,9 +41,9 @@ enum CLI {
             let simulator = Simulator(runner: runner)
             let inventory = try simulator.inventory()
             let device = try inventory.select(udid: options.udid, model: options.model)
-            let plan = CapturePlan(current: options.current, posture: options.posture, orientation: options.orientation)
+            let plan = CapturePlan(posture: options.posture, orientation: options.orientation)
             let conditions = try plan.conditions(for: device)
-            if !options.current { try inventory.verifyGUIIdentity(device) }
+            try inventory.verifyGUIIdentity(device)
             let environment = [
                 "os": ProcessInfo.processInfo.operatingSystemVersionString,
                 "xcode": try runner.run("/usr/bin/xcodebuild", ["-version"], timeout: 30).text.trimmingCharacters(in: .whitespacesAndNewlines),

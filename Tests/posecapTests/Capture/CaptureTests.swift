@@ -2,14 +2,13 @@ import XCTest
 @testable import posecap
 
 final class CaptureTests: XCTestCase {
-    func testMatrixDefaultsFilteringAndCurrent() throws {
+    func testMatrixDefaultsAndFiltering() throws {
         let defaults = CapturePlan()
         XCTAssertEqual(try defaults.conditions(for: device()).map(\.title), [
             "closed / portrait", "closed / landscape", "half-open / portrait", "half-open / landscape", "open / portrait", "open / landscape",
         ])
         XCTAssertEqual(try CapturePlan(orientation: .portrait).conditions(for: device()).count, 3)
         XCTAssertEqual(try CapturePlan(posture: .closed, orientation: .landscape).conditions(for: device()).count, 1)
-        XCTAssertTrue(try CapturePlan(current: true).conditions(for: device())[0].isCurrent)
         let phone = device(model: "iPhone 18 Pro")
         XCTAssertEqual(try defaults.conditions(for: phone).count, 2)
         XCTAssertThrowsError(try CapturePlan(posture: .open).conditions(for: phone))
@@ -33,32 +32,17 @@ final class CaptureTests: XCTestCase {
         XCTAssertEqual(Assessment.evaluate(Condition(), observations: Observations(), imageCount: 2, failed: false), .captured)
     }
 
-    func testCurrentCaptureSavesBlackPNGWithoutGUI() throws {
+    func testCaptureRejectsCurrentAndEmptyPlansBeforeGUIOrScreenshots() throws {
         let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
         let store = try CaptureStore(root: root.path)
         let runner = FakeRunner()
         let controller = FakeController()
         let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
-        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition()], label: nil, store: store, environment: [:]), 0)
-        let manifest = try readManifest(store)
-        XCTAssertEqual(manifest.results[0].images.count, 1)
-        XCTAssertEqual(manifest.results[0].images[0].width, 2)
+        for conditions: [Condition] in [[], [Condition()], [Condition(orientation: .portrait), Condition()]] {
+            XCTAssertThrowsError(try engine.capture(device: device(), conditions: conditions, label: nil, store: store, environment: [:]))
+        }
         XCTAssertEqual(controller.prepareCount, 0)
-        XCTAssertEqual(controller.checkCount, 0)
-    }
-
-    func testMultiDisplayCurrentSucceedsAndSavesBoth() throws {
-        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
-        let store = try CaptureStore(root: root.path)
-        let runner = FakeRunner(); runner.ids = ["17", "42"]
-        runner.deviceNames = ["42": "primary", "17": "primary-1"]
-        let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: FakeController(), cancellation: Cancellation(), settleSeconds: 0)
-        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition()], label: "Home", store: store, environment: [:]), 0)
-        let result = try readManifest(store).results[0]
-        XCTAssertEqual(result.outcome, .captured)
-        XCTAssertEqual(result.images.map(\.displayID), ["17", "42"])
-        XCTAssertNil(result.observations.activeDisplayID)
-        XCTAssertEqual(runner.enumerationCount, 2)
+        XCTAssertEqual(runner.screenshotCount, 0)
     }
 
     func testConsecutiveConditionsReusePostureAndCaptureOnlySelectedDisplay() throws {
@@ -363,7 +347,7 @@ final class CaptureTests: XCTestCase {
         let cancellation = Cancellation(); cancellation.cancel()
         let runner = FakeRunner()
         let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: FakeController(), cancellation: cancellation, settleSeconds: 0)
-        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition()], label: nil, store: store, environment: [:]), 1)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .portrait)], label: nil, store: store, environment: [:]), 1)
         XCTAssertEqual(try readManifest(store).results[0].progress, .pending)
         XCTAssertEqual(runner.screenshotCount, 0)
     }
@@ -374,7 +358,7 @@ final class CaptureTests: XCTestCase {
         let cancellation = Cancellation()
         let runner = FakeRunner(); runner.ids = ["17", "42"]; runner.afterScreenshot = { cancellation.cancel() }
         let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: FakeController(), cancellation: cancellation, settleSeconds: 0)
-        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition()], label: nil, store: store, environment: [:]), 1)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .portrait)], label: nil, store: store, environment: [:]), 1)
         let manifest = try readManifest(store)
         XCTAssertEqual(manifest.results[0].images.count, 1)
         XCTAssertEqual(manifest.results[0].outcome, .failed)

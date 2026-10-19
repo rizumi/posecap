@@ -10,20 +10,20 @@ final class CaptureEngine {
     }
 
     func capture(device: Device, conditions: [Condition], label: String?, store: CaptureStore, environment: [String: String]) throws -> Int32 {
+        guard !conditions.isEmpty, conditions.allSatisfy({ !$0.isCurrent }) else {
+            throw ToolError("Capture requires an explicit posture or orientation; current-state capture is no longer supported.")
+        }
         var manifest = Manifest(captureID: store.captureID, createdAt: timestamp(), label: label, device: device,
                                 environment: environment, results: conditions.enumerated().map { CaptureResult(index: $0.offset, requested: $0.element) })
         try store.save(manifest)
-        let usesGUI = conditions.contains { !$0.isCurrent }
-        if usesGUI {
-            do { try controller.prepare(device, conditions: conditions) }
-            catch {
-                manifest.messages.append("GUI preparation failed: \(error)")
-                manifest.results[0].progress = .finished
-                manifest.results[0].messages.append("GUI preparation failed: \(error)")
-                manifest.finishedAt = timestamp()
-                try store.save(manifest)
-                return 1
-            }
+        do { try controller.prepare(device, conditions: conditions) }
+        catch {
+            manifest.messages.append("GUI preparation failed: \(error)")
+            manifest.results[0].progress = .finished
+            manifest.results[0].messages.append("GUI preparation failed: \(error)")
+            manifest.finishedAt = timestamp()
+            try store.save(manifest)
+            return 1
         }
 
         var stopReason: String?
@@ -38,10 +38,8 @@ final class CaptureEngine {
             try store.save(manifest)
             var operationFailed = false
             do {
-                if usesGUI {
-                    do { try controller.checkTarget(device); result.observations.guiTargetMatched = true }
-                    catch { stopReason = "Target identity is no longer safe: \(error)"; throw error }
-                }
+                do { try controller.checkTarget(device); result.observations.guiTargetMatched = true }
+                catch { stopReason = "Target identity is no longer safe: \(error)"; throw error }
                 result.observations.beforeDisplays = try simulator.displays(device)
                 if let posture = result.requested.posture, postureChanged {
                     do { try controller.click(posture.controlHelp, device: device) }
@@ -105,7 +103,7 @@ final class CaptureEngine {
                     }
                     result.messages.append("Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.")
                 }
-                let displays = result.requested.isCurrent ? result.observations.beforeDisplays : try simulator.displays(device)
+                let displays = try simulator.displays(device)
                 let preferredDisplay = DisplaySelection.preferredDisplay(device: device, posture: result.requested.posture,
                                                                          displays: displays, before: result.observations.beforeDisplays)
                 let captureDisplays = preferredDisplay.map { [$0] } ?? displays
@@ -114,10 +112,8 @@ final class CaptureEngine {
                         result.messages.append("simctl UI Orientation differs from the requested direction on one or more selected displays. The application may restrict rotation; display UI orientation does not drive additional rotations.")
                     }
                 }
-                if usesGUI {
-                    do { try controller.checkTarget(device) }
-                    catch { stopReason = "Target identity changed before capture: \(error)"; throw error }
-                }
+                do { try controller.checkTarget(device) }
+                catch { stopReason = "Target identity changed before capture: \(error)"; throw error }
                 result.observations.afterDisplays = displays
                 if displays.count == 1 {
                     result.observations.activeDisplayID = displays[0].id
@@ -150,7 +146,7 @@ final class CaptureEngine {
                     } else {
                         result.messages.append("Device Hub orientation selection changed during capture.")
                     }
-                } else if usesGUI {
+                } else {
                     do { try controller.checkTarget(device) }
                     catch { stopReason = "Target identity changed during capture: \(error)"; throw error }
                 }

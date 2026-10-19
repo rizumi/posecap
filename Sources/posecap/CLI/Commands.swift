@@ -68,7 +68,6 @@ struct CaptureCommand: ParsableCommand {
         discussion: """
         Defaults to all postures/orientations: six for Duo, two for other models.
         Requires a booted Simulator; select one if several are booted.
-        --current cannot be combined with posture or orientation filters.
         GUI changes require Device Hub 27.1 and Accessibility/Automation access.
         Final posture/orientation is left in place. Completed captures exit 0.
         """)
@@ -77,7 +76,7 @@ struct CaptureCommand: ParsableCommand {
     var udid: String?
     @Option(help: "Exact Simulator model name")
     var model: String?
-    @Option(help: "Screen name in the report")
+    @Option(help: "Label in the report")
     var label: String?
     @Option(help: "Output directory")
     var output = "./output"
@@ -85,8 +84,6 @@ struct CaptureCommand: ParsableCommand {
     var posture: Posture?
     @Option(help: "Device orientation (landscape uses landscape-left)")
     var orientation: Orientation?
-    @Flag(help: "Capture without GUI changes")
-    var current = false
 
     mutating func validate() throws {
         for (value, name) in [(model, "--model"), (label, "--label"), (Optional(output), "--output")] {
@@ -100,9 +97,6 @@ struct CaptureCommand: ParsableCommand {
         }
         guard udid == nil || model == nil else {
             throw ValidationError("Use only one of --udid and --model.")
-        }
-        guard !current || (posture == nil && orientation == nil) else {
-            throw ValidationError("--current cannot be combined with --posture or --orientation.")
         }
     }
 

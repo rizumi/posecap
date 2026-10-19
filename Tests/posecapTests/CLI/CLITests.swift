@@ -17,17 +17,17 @@ final class CLITests: XCTestCase {
 
     func testCommandValidationAndArgumentParserSyntax() throws {
         let capture = try XCTUnwrap(PosecapCommand.parseAsRoot([
-            "capture", "--model=iPhone Duo", "--label", "Home", "--current",
+            "capture", "--model=iPhone Duo", "--label", "Home",
         ]) as? CaptureCommand)
         XCTAssertEqual(capture.model, "iPhone Duo")
         XCTAssertEqual(capture.label, "Home")
-        XCTAssertTrue(capture.current)
         XCTAssertEqual(capture.output, "./output")
         let id = "abcdefab-0000-0000-0000-000000000001"
         XCTAssertEqual(try CaptureCommand.parse(["--udid", id]).udid, id.uppercased())
         for args in [
             ["capture", "--udid", "invalid"], ["capture", "--model", ""],
             ["capture", "--label", "bad\0label"], ["capture", "--output", ""],
+            ["capture", "--current"],
             ["capture", "--current", "--orientation", "portrait"],
             ["capture", "--posture", "invalid"], ["capture", "--orientation", "invalid"],
             ["capture", "--model"], ["report", "--input", ""],
