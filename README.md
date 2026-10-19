@@ -10,10 +10,10 @@ then compare them in an offline HTML report.
 Open the app screen you want to capture; posecap handles the screenshots and
 report. It does not build, install, or navigate apps.
 
-[![DayTrip capture report on iPhone Duo](docs/images/daytrip-preview.png)](docs/example/index.html)
+[![DayTrip capture report on iPhone Duo](docs/images/daytrip-preview.png)](https://rizumi.github.io/posecap/)
 
-To view the [example report](docs/example), clone the repository and run
-`open docs/example/index.html`. GitHub displays the HTML source.
+View the [example report](https://rizumi.github.io/posecap/) online. Its
+source is in [docs/example](docs/example).
 
 ## Requirements
 
