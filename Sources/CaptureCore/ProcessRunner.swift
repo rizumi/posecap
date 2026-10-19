@@ -42,6 +42,21 @@ final class ProcessRunner: CommandRunning {
 
     func run(_ executable: String, _ arguments: [String], timeout: TimeInterval = 30) throws -> CommandOutput {
         try cancellation.check()
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            if ProcessInfo.processInfo.environment["POSECAP_TRACE_TIMING"] == "1" {
+                let name: String
+                if executable == "/usr/bin/osascript", arguments.count == 5 {
+                    name = "Device Hub " + arguments[3] + (arguments[4].isEmpty ? "" : " " + arguments[4])
+                } else if arguments.first == "simctl" {
+                    name = "simctl " + (arguments.count > 3 && arguments[1] == "io" ? arguments[3] : arguments.dropFirst().first ?? "")
+                } else {
+                    name = URL(fileURLWithPath: executable).lastPathComponent
+                }
+                let elapsed = String(format: "%.3f", ProcessInfo.processInfo.systemUptime - started)
+                FileHandle.standardError.write(Data("[timing] \(elapsed)s \(name)\n".utf8))
+            }
+        }
         let fm = FileManager.default
         let directory = fm.temporaryDirectory.appendingPathComponent("capture-process-\(UUID().uuidString)", isDirectory: true)
         try fm.createDirectory(at: directory, withIntermediateDirectories: false)

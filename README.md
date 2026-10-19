@@ -33,7 +33,7 @@ Tested with macOS 26.6.2, Xcode 27.1 RC (27A9275), and Swift 6.4.
 With [mise](https://mise.jdx.dev/getting-started.html) installed and activated:
 
 ```sh
-mise use -g github:rizumi/posecap@0.1.1
+mise use -g github:rizumi/posecap@0.1.2
 ```
 
 Release binaries support Apple Silicon Macs (arm64).
@@ -77,14 +77,22 @@ posecap capture --model "iPhone Duo" --posture closed --orientation portrait
 When multiple Simulators are booted, select one with `--model` or `--udid`.
 The final posture and orientation are left in place.
 
+Consecutive captures of the same posture reuse it. Orientation changes use the
+shortest left/right rotation sequence from Device Hub readback; an already
+selected orientation is left in place. After a posture change, a differing
+direction is first reconciled with one named orientation request. GUI changes
+wait four seconds for settling.
+For command timings, run `POSECAP_TRACE_TIMING=1 posecap capture ...`;
+each completed condition also prints its elapsed time.
+
 Reports work offline. Keep the capture directories alongside `index.html` when
 sharing. Run `posecap --help` for commands or `posecap capture --help` and
 `posecap report --help` for their options.
 
 ## Known limitations
 
-- iPhone Duo posture and active-display selection remain unverified. Images are
-  saved, but unverified captures return a nonzero exit code.
+- Captures succeed when images are saved. Missing posture or active-display
+  readback does not cause an error; all built-in displays are saved.
 - Orientation changes can fail on iPhone Duo. App rotation and responsiveness
   are not verified.
 - GUI control has only been tested with the Xcode build above and English

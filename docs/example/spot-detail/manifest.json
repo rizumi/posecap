@@ -1,7 +1,7 @@
 {
   "captureID": "spot-detail",
   "complete": true,
-  "createdAt": "2026-10-19T07:57:07Z",
+  "createdAt": "2026-10-19T11:35:40Z",
   "device": {
     "available": true,
     "deviceTypeIdentifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-Duo",
@@ -15,11 +15,11 @@
   },
   "environment": {
     "os": "Version 26.6.2 (Build 25G83)",
-    "tool": "0.1.0-dev",
+    "tool": "0.1.1",
     "xcode": "Xcode 27.1\nBuild version 27A9275"
   },
-  "finishedAt": "2026-10-19T08:04:19Z",
-  "label": "スポット詳細",
+  "finishedAt": "2026-10-19T11:37:22Z",
+  "label": "Spot details",
   "messages": [],
   "results": [
     {
@@ -39,9 +39,9 @@
       ],
       "index": 0,
       "messages": [
-        "The posture button was dispatched. Device Hub did not expose a selected posture or hinge-angle readback; posture remains unverified.",
-        "Orientation was requested by name, then corrected with at most three right rotations if GUI readback differed. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
-        "Active display unverified; all built-in displays are retained without selecting by brightness or fixed screen ID."
+        "The posture button was dispatched.",
+        "Initial Device Hub orientation: Landscape Left.",
+        "Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state."
       ],
       "observations": {
         "afterDisplays": [
@@ -89,13 +89,13 @@
           "Closed",
           "Orientation: Portrait"
         ],
-        "displaySelectionReason": "Multiple built-in displays were enumerated; active display is unverified. All built-in displays are saved.",
+        "displaySelectionReason": "All enumerated built-in displays are saved.",
         "guiOrientationAfterCapture": "portrait",
         "guiOrientationBeforeCapture": "portrait",
         "guiTargetMatched": true,
         "observedDeviceOrientation": "portrait"
       },
-      "outcome": "unverified",
+      "outcome": "captured",
       "progress": "finished",
       "requested": {
         "orientation": "portrait",
@@ -119,10 +119,11 @@
       ],
       "index": 1,
       "messages": [
-        "The posture button was dispatched. Device Hub did not expose a selected posture or hinge-angle readback; posture remains unverified.",
-        "Orientation was requested by name, then corrected with at most three right rotations if GUI readback differed. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
-        "simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations.",
-        "Active display unverified; all built-in displays are retained without selecting by brightness or fixed screen ID."
+        "The posture requested by the preceding successful condition was retained; no posture readback is available.",
+        "Initial Device Hub orientation: Portrait.",
+        "Rotate Left: Portrait → Landscape Left.",
+        "Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
+        "simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations."
       ],
       "observations": {
         "afterDisplays": [
@@ -167,16 +168,15 @@
         ],
         "deviceOrientationSource": "Device Hub > Device > Orientation menu checkmark",
         "dispatchedControls": [
-          "Closed",
-          "Orientation: Landscape Left"
+          "Rotate Left"
         ],
-        "displaySelectionReason": "Multiple built-in displays were enumerated; active display is unverified. All built-in displays are saved.",
+        "displaySelectionReason": "All enumerated built-in displays are saved.",
         "guiOrientationAfterCapture": "landscape-left",
         "guiOrientationBeforeCapture": "landscape-left",
         "guiTargetMatched": true,
         "observedDeviceOrientation": "landscape-left"
       },
-      "outcome": "unverified",
+      "outcome": "captured",
       "progress": "finished",
       "requested": {
         "orientation": "landscape",
@@ -200,9 +200,9 @@
       ],
       "index": 2,
       "messages": [
-        "The posture button was dispatched. Device Hub did not expose a selected posture or hinge-angle readback; posture remains unverified.",
-        "Orientation was requested by name, then corrected with at most three right rotations if GUI readback differed. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
-        "Active display unverified; all built-in displays are retained without selecting by brightness or fixed screen ID."
+        "The posture button was dispatched.",
+        "Initial Device Hub orientation: Portrait.",
+        "Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state."
       ],
       "observations": {
         "afterDisplays": [
@@ -247,19 +247,15 @@
         ],
         "deviceOrientationSource": "Device Hub > Device > Orientation menu checkmark",
         "dispatchedControls": [
-          "Partially Open",
-          "Orientation: Portrait",
-          "Rotate Right",
-          "Rotate Right",
-          "Rotate Right"
+          "Partially Open"
         ],
-        "displaySelectionReason": "Multiple built-in displays were enumerated; active display is unverified. All built-in displays are saved.",
+        "displaySelectionReason": "All enumerated built-in displays are saved.",
         "guiOrientationAfterCapture": "portrait",
         "guiOrientationBeforeCapture": "portrait",
         "guiTargetMatched": true,
         "observedDeviceOrientation": "portrait"
       },
-      "outcome": "unverified",
+      "outcome": "captured",
       "progress": "finished",
       "requested": {
         "orientation": "portrait",
@@ -283,10 +279,11 @@
       ],
       "index": 3,
       "messages": [
-        "The posture button was dispatched. Device Hub did not expose a selected posture or hinge-angle readback; posture remains unverified.",
-        "Orientation was requested by name, then corrected with at most three right rotations if GUI readback differed. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
-        "simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations.",
-        "Active display unverified; all built-in displays are retained without selecting by brightness or fixed screen ID."
+        "The posture requested by the preceding successful condition was retained; no posture readback is available.",
+        "Initial Device Hub orientation: Portrait.",
+        "Rotate Left: Portrait → Landscape Left.",
+        "Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
+        "simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations."
       ],
       "observations": {
         "afterDisplays": [
@@ -331,19 +328,15 @@
         ],
         "deviceOrientationSource": "Device Hub > Device > Orientation menu checkmark",
         "dispatchedControls": [
-          "Partially Open",
-          "Orientation: Landscape Left",
-          "Rotate Right",
-          "Rotate Right",
-          "Rotate Right"
+          "Rotate Left"
         ],
-        "displaySelectionReason": "Multiple built-in displays were enumerated; active display is unverified. All built-in displays are saved.",
+        "displaySelectionReason": "All enumerated built-in displays are saved.",
         "guiOrientationAfterCapture": "landscape-left",
         "guiOrientationBeforeCapture": "landscape-left",
         "guiTargetMatched": true,
         "observedDeviceOrientation": "landscape-left"
       },
-      "outcome": "unverified",
+      "outcome": "captured",
       "progress": "finished",
       "requested": {
         "orientation": "landscape",
@@ -367,9 +360,10 @@
       ],
       "index": 4,
       "messages": [
-        "The posture button was dispatched. Device Hub did not expose a selected posture or hinge-angle readback; posture remains unverified.",
-        "Orientation was requested by name, then corrected with at most three right rotations if GUI readback differed. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
-        "Active display unverified; all built-in displays are retained without selecting by brightness or fixed screen ID."
+        "The posture button was dispatched.",
+        "Initial Device Hub orientation: Landscape Left.",
+        "Rotate Left: Landscape Right → Portrait.",
+        "Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state."
       ],
       "observations": {
         "afterDisplays": [
@@ -416,17 +410,15 @@
         "dispatchedControls": [
           "Open",
           "Orientation: Portrait",
-          "Rotate Right",
-          "Rotate Right",
-          "Rotate Right"
+          "Rotate Left"
         ],
-        "displaySelectionReason": "Multiple built-in displays were enumerated; active display is unverified. All built-in displays are saved.",
+        "displaySelectionReason": "All enumerated built-in displays are saved.",
         "guiOrientationAfterCapture": "portrait",
         "guiOrientationBeforeCapture": "portrait",
         "guiTargetMatched": true,
         "observedDeviceOrientation": "portrait"
       },
-      "outcome": "unverified",
+      "outcome": "captured",
       "progress": "finished",
       "requested": {
         "orientation": "portrait",
@@ -450,10 +442,11 @@
       ],
       "index": 5,
       "messages": [
-        "The posture button was dispatched. Device Hub did not expose a selected posture or hinge-angle readback; posture remains unverified.",
-        "Orientation was requested by name, then corrected with at most three right rotations if GUI readback differed. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
-        "simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations.",
-        "Active display unverified; all built-in displays are retained without selecting by brightness or fixed screen ID."
+        "The posture requested by the preceding successful condition was retained; no posture readback is available.",
+        "Initial Device Hub orientation: Portrait.",
+        "Rotate Left: Portrait → Landscape Left.",
+        "Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.",
+        "simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations."
       ],
       "observations": {
         "afterDisplays": [
@@ -498,19 +491,15 @@
         ],
         "deviceOrientationSource": "Device Hub > Device > Orientation menu checkmark",
         "dispatchedControls": [
-          "Open",
-          "Orientation: Landscape Left",
-          "Rotate Right",
-          "Rotate Right",
-          "Rotate Right"
+          "Rotate Left"
         ],
-        "displaySelectionReason": "Multiple built-in displays were enumerated; active display is unverified. All built-in displays are saved.",
+        "displaySelectionReason": "All enumerated built-in displays are saved.",
         "guiOrientationAfterCapture": "landscape-left",
         "guiOrientationBeforeCapture": "landscape-left",
         "guiTargetMatched": true,
         "observedDeviceOrientation": "landscape-left"
       },
-      "outcome": "unverified",
+      "outcome": "captured",
       "progress": "finished",
       "requested": {
         "orientation": "landscape",

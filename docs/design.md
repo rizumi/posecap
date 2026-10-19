@@ -32,11 +32,11 @@ supported or unsupported.
 ## Evidence and outcomes
 
 Preserve requested conditions separately from observations and their sources.
+Legacy verified and unverified outcomes remain readable in existing manifests.
 
 | Outcome | Meaning |
 | --- | --- |
-| Verified | Available evidence establishes agreement with the requested condition. |
-| Unverified | The change was dispatched, but evidence is insufficient to establish agreement. |
+| Captured | Images were saved successfully; missing state readback does not prevent success. |
 | Mismatched | An observed state differs from the requested condition. |
 | Failed | An operation or image save failed. |
 
@@ -47,14 +47,14 @@ measurement of physical device orientation. PNG dimensions describe the saved
 raster only and do not verify folding, hinge angle, or application rotation.
 Do not classify a black image as failed merely because it is black.
 
-Save images for unverified conditions. Diagnostic images for mismatched
+Save images even when state readback is unavailable. Diagnostic images for mismatched
 conditions must not be presented as successful captures of the requested
 condition. Reports always identify mismatched, failed, and incomplete results;
-unverified status is included with `--details`. Retain already saved images
+capture observations are included with `--details`. Retain already saved images
 and metadata on partial failure.
 
 Continue a batch only while the target and subsequent operations can still be
-handled safely. Exit nonzero if any unverified, mismatched, or failed conditions
+handled safely. Exit nonzero if any mismatched or failed conditions
 remain. Stop GUI mutations when target or control identity becomes uncertain.
 
 ## Capture contract
@@ -75,26 +75,32 @@ Only built-in displays are captured. When one is listed it is the sole eligible
 display. Multiple built-in displays are all retained; no active panel is inferred
 from a requested posture, a fixed display ID, power state, or image brightness.
 
-Orientation is first requested through Device > Orientation. If GUI readback
-reports a different planar orientation, posecap uses the semantically identified
-Rotate Right control up to three times, waiting and reading the menu after each
-turn. It stops as soon as the requested orientation matches. Unknown or face-up/
-face-down readback does not trigger blind rotations; target identity or control
-failures stop the batch. If the requested orientation still cannot be confirmed,
-the condition fails before any screenshot and the batch stops. Every corrective
-action is recorded.
+Consecutive successful conditions with the same requested posture retain the
+previous posture instead of pressing its button and waiting again. This is
+session-local dispatch reuse, not posture readback. Any failed condition clears
+the reuse state. The manifest records reuse without claiming a new dispatch.
+
+After posture changes, posecap reads Device > Orientation. A differing direction
+after a posture dispatch, or unknown/face-up/face-down readback, permits one named
+orientation request to reconcile the state. From fresh readback, posecap computes
+the shortest sequence of Controls > Rotate Left / Rotate Right actions. A matching
+orientation needs no action; other planar orientations need at most two turns.
+Each turn settles and is read back before proceeding. A known unexpected result
+stops the batch before images instead of continuing to rotate. If readback becomes
+unknown, no further turns are attempted. Every dispatched action and its
+before/after readback are recorded.
 
 The Device menu is populated only while Device Hub is frontmost. The adapter
 reads its checkmark before and after saving images. Agreement establishes the
 Simulator orientation reported by Device Hub, with that source explicitly
 recorded; it is not independent motion-sensor evidence or proof of app rotation.
-Before capture, a different or unknown selection must be corrected or the
-condition fails without an image. Missing or changing readback after saving
-images remains unverified when readback returns an unknown or changed value;
+Before capture, a known different selection must be corrected or the
+condition fails without an image. Unknown readback permits capture. Missing
+or changing readback after saving images is recorded without failing the capture;
 a readback operation error fails the condition and stops the batch.
 simctl UI Orientation never drives additional rotations. Fold state has no
-GUI readback and stays unverified. iPhone Duo also
-retains an unverified active-display status when both panels are enumerated.
+GUI readback; the dispatched posture is assumed. Both iPhone Duo panels
+are saved without requiring active-display readback.
 
 Each invocation gets a new UTC timestamp plus UUID capture directory. It contains
 PNGs and a schema-versioned manifest updated after every image. Labels annotate
@@ -125,22 +131,39 @@ deadlines; it never constructs shell commands from labels or device names.
 GUI operations validate the running Device Hub and Simulator inventory, then
 check the selected target inside the operation's AppleScript. They do not run
 an additional standalone AX target-check subprocess immediately beforehand.
-Explicit checks around capture and the adapter's checks around mutations remain
-in place.
+Explicit checks before capture and the adapter's checks around mutations remain
+in place. After capture, orientation readback also checks target identity, so a
+separate target-check subprocess is needed only for posture-only conditions.
+Each AppleScript operation resolves a unique sidebar row once, then rechecks
+that row and the window title around actions. Row references never survive an
+operation. Display enumeration records the state before changes, immediately
+before images, and after images; current-state capture reuses the initial
+enumeration for the pre-image state.
 
 ## Timing, failures, and exit codes
 
 External commands have 30-second deadlines, with a 25-second Apple-event timeout.
-GUI mutations settle for at least four seconds. Each orientation is requested
-once through its named menu item, followed by at most three corrective right
-turns driven only by GUI menu readback. Each turn uses the same settling delay
-and target checks. Image dimensions and simctl UI Orientation never drive
+GUI mutations settle for at least four seconds. Each orientation uses at most
+two left/right turns driven only by GUI menu readback, with one named request
+allowed first when no planar orientation is available or a posture dispatch leaves
+a differing direction. Each turn uses the same settling delay and target checks.
+Image dimensions and simctl UI Orientation never drive
 correction. Screenshots are not retried. Fixed waiting does not prove
 application readiness or animation completion; posecap does not launch apps or
 verify application responsiveness.
 
-Exit codes are 0 for complete verified captures or successful non-capture commands,
-1 for GUI preparation failures or incomplete/unverified/mismatched/failed captures,
+Completed conditions print elapsed seconds. `POSECAP_TRACE_TIMING=1` writes
+per-command durations to stderr, including failed commands, without device UUIDs
+or output paths. This separates GUI and simctl overhead from settling waits.
+Controls exposes both Rotate Left and Rotate Right even though the observed
+toolbar exposes only Rotate Right. Both menu items are checked during preparation.
+Rotation opens the Controls menu before selecting its item. A successful click
+was observed without a corresponding orientation change immediately after folding,
+including with the menu open. The named request after a posture change reconciles
+that transition; the readback check catches a failed turn before screenshots.
+
+Exit codes are 0 for complete captures or successful non-capture commands,
+1 for GUI preparation failures or incomplete/mismatched/failed captures,
 and 2 for selection, argument, other setup, or report failures. During capture,
 SIGINT/SIGTERM terminate the active child process and retain checkpointed results.
 An uncatchable termination or storage failure can leave a
@@ -157,7 +180,7 @@ adapter assumptions, not Simulator API guarantees.
   panel.
 - The posture buttons expose semantic AXHelp labels `Closed`, `Partially Open`,
   and `Open`, but no value or selected state. Dispatching them cannot by itself
-  produce a verified fold result.
+  provide fold-state readback.
 - The selected sidebar row exposes a display name, OS version, and `Simulator`
   label, but no UDID. Name/version reconciliation must reject duplicates in both
   the Simulator inventory and the GUI.
@@ -167,9 +190,11 @@ adapter assumptions, not Simulator API guarantees.
   replaces any UI-Orientation-driven rotation loop.
 - For half-open and open iPhone Duo, a direct named orientation request can be
   followed by checkmark readback that differs from the request, even after long
-  settling waits or a repeated selection. Relative toolbar rotations change the
-  reported state. The bounded GUI-readback correction loop exists for this;
-  no model-specific offset is hard-coded.
+  settling waits or a repeated selection. Relative Controls-menu rotations correct
+  the reported state after that request. They are used directly between conditions
+  with the same posture; no model-specific offset is hard-coded. Rotate Right
+  advances Portrait → Landscape Right → Portrait Upside Down → Landscape Left;
+  Rotate Left reverses that order.
 - A full per-element attribute walk is too slow for routine use. Prefer bounded,
   scoped reads with deadlines on both inspection and action subprocesses.
 

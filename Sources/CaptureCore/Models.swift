@@ -21,6 +21,11 @@ enum Orientation: String, Codable, CaseIterable {
     var uiValue: String { self == .portrait ? "Portrait" : "Landscape Left" }
 }
 
+enum RotationDirection: String, CaseIterable {
+    case left, right
+    var menuTitle: String { self == .left ? "Rotate Left" : "Rotate Right" }
+}
+
 enum DeviceOrientation: String, Codable, CaseIterable {
     case portrait, upsideDown = "portrait-upside-down", landscapeLeft = "landscape-left"
     case landscapeRight = "landscape-right", faceUp = "face-up", faceDown = "face-down"
@@ -34,6 +39,25 @@ enum DeviceOrientation: String, Codable, CaseIterable {
         case .faceDown: return "Face Down"
         }
     }
+
+    // Device Hub Controls-menu rotation order, verified using menu readback.
+    private static let clockwise: [DeviceOrientation] = [.portrait, .landscapeRight, .upsideDown, .landscapeLeft]
+
+    func rotations(to target: Orientation) -> [RotationDirection]? {
+        guard let start = Self.clockwise.firstIndex(of: self) else { return nil }
+        let end = target == .portrait ? 0 : 3
+        switch (end - start + 4) % 4 {
+        case 0: return []
+        case 1: return [.right]
+        case 2: return [.right, .right]
+        default: return [.left]
+        }
+    }
+
+    func rotated(_ direction: RotationDirection) -> DeviceOrientation? {
+        guard let index = Self.clockwise.firstIndex(of: self) else { return nil }
+        return Self.clockwise[(index + (direction == .right ? 1 : 3)) % 4]
+    }
 }
 
 struct Condition: Codable, Equatable {
@@ -45,7 +69,7 @@ struct Condition: Codable, Equatable {
     }
 }
 
-enum Outcome: String, Codable { case verified, unverified, mismatched, failed }
+enum Outcome: String, Codable { case captured, verified, unverified, mismatched, failed }
 enum Progress: String, Codable { case pending, running, finished }
 
 struct Device: Codable, Equatable {
@@ -128,9 +152,6 @@ enum Assessment {
         if failed || imageCount == 0 { return .failed }
         if let expected = condition.posture, let actual = observations.observedPosture, expected != actual { return .mismatched }
         if let expected = condition.orientation, let actual = observations.observedDeviceOrientation, expected.uiValue != actual.menuTitle { return .mismatched }
-        if observations.activeDisplayID == nil { return .unverified }
-        if condition.posture != nil && observations.observedPosture == nil { return .unverified }
-        if condition.orientation != nil && observations.observedDeviceOrientation == nil { return .unverified }
-        return .verified
+        return .captured
     }
 }

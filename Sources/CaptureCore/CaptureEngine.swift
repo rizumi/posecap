@@ -27,9 +27,12 @@ final class CaptureEngine {
         }
 
         var stopReason: String?
+        var previousPosture: Posture?
         for index in conditions.indices {
             if cancellation.cancelled { stopReason = "Interrupted; remaining conditions were not attempted."; break }
             var result = manifest.results[index]
+            let started = ProcessInfo.processInfo.systemUptime
+            let postureChanged = result.requested.posture != nil && result.requested.posture != previousPosture
             result.progress = .running
             manifest.results[index] = result
             try store.save(manifest)
@@ -40,50 +43,70 @@ final class CaptureEngine {
                     catch { stopReason = "Target identity is no longer safe: \(error)"; throw error }
                 }
                 result.observations.beforeDisplays = try simulator.displays(device)
-                if let posture = result.requested.posture {
+                if let posture = result.requested.posture, postureChanged {
                     do { try controller.click(posture.controlHelp, device: device) }
                     catch { stopReason = "GUI operation failed; no further GUI actions will be attempted: \(error)"; throw error }
                     result.observations.dispatchedControls.append(posture.controlHelp)
                     manifest.results[index] = result
                     try store.save(manifest)
                     try cancellation.sleep(seconds: settleSeconds)
-                    result.messages.append("The posture button was dispatched. Device Hub did not expose a selected posture or hinge-angle readback; posture remains unverified.")
+                    result.messages.append("The posture button was dispatched.")
+                } else if result.requested.posture != nil {
+                    result.messages.append("The posture requested by the preceding successful condition was retained; no posture readback is available.")
                 }
-                var displays = try simulator.displays(device)
                 if let orientation = result.requested.orientation {
-                    do { try controller.setOrientation(orientation, device: device) }
-                    catch { stopReason = "GUI orientation command failed; no further GUI actions will be attempted: \(error)"; throw error }
-                    result.observations.dispatchedControls.append("Orientation: " + orientation.uiValue)
-                    manifest.results[index] = result
-                    try store.save(manifest)
-                    try cancellation.sleep(seconds: settleSeconds)
                     do { result.observations.guiOrientationBeforeCapture = try controller.readOrientation(device) }
                     catch { stopReason = "GUI orientation could not be read safely: \(error)"; throw error }
-                    // Device Hub 27.1 may apply a named direction relative to the folded
-                    // device frame. Correct from GUI readback, never from app pixels.
-                    for _ in 0..<3 {
-                        guard let observed = result.observations.guiOrientationBeforeCapture,
-                              observed.menuTitle != orientation.uiValue,
-                              [.portrait, .upsideDown, .landscapeLeft, .landscapeRight].contains(observed)
-                        else { break }
-                        do { try controller.rotateRight(device) }
-                        catch { stopReason = "GUI orientation correction failed: \(error)"; throw error }
-                        result.observations.dispatchedControls.append("Rotate Right")
+                    result.messages.append("Initial Device Hub orientation: \(result.observations.guiOrientationBeforeCapture?.menuTitle ?? "unknown").")
+                    // Immediately after folding, a relative turn can leave menu
+                    // readback unchanged. Reconcile a differing direction once,
+                    // then use fresh readback to choose the shortest correction.
+                    let observed = result.observations.guiOrientationBeforeCapture
+                    if observed?.rotations(to: orientation) == nil || (postureChanged && observed?.menuTitle != orientation.uiValue) {
+                        let dispatched: Bool
+                        do { dispatched = try controller.setOrientation(orientation, device: device) }
+                        catch { stopReason = "GUI orientation command failed; no further GUI actions will be attempted: \(error)"; throw error }
+                        if dispatched {
+                            result.observations.dispatchedControls.append("Orientation: " + orientation.uiValue)
+                            manifest.results[index] = result
+                            try store.save(manifest)
+                            try cancellation.sleep(seconds: settleSeconds)
+                        }
+                        do { result.observations.guiOrientationBeforeCapture = try controller.readOrientation(device) }
+                        catch { stopReason = "GUI orientation could not be read safely: \(error)"; throw error }
+                    }
+                    let rotations = result.observations.guiOrientationBeforeCapture?.rotations(to: orientation) ?? []
+                    for direction in rotations {
+                        guard let before = result.observations.guiOrientationBeforeCapture,
+                              before.menuTitle != orientation.uiValue,
+                              let expected = before.rotated(direction) else { break }
+                        do { try controller.rotate(direction, device: device) }
+                        catch { stopReason = "GUI orientation rotation failed: \(error)"; throw error }
+                        result.observations.dispatchedControls.append(direction.menuTitle)
                         manifest.results[index] = result
                         try store.save(manifest)
                         try cancellation.sleep(seconds: settleSeconds)
                         do { result.observations.guiOrientationBeforeCapture = try controller.readOrientation(device) }
-                        catch { stopReason = "GUI orientation correction readback failed: \(error)"; throw error }
+                        catch { stopReason = "GUI orientation rotation readback failed: \(error)"; throw error }
+                        let after = result.observations.guiOrientationBeforeCapture
+                        result.messages.append("\(direction.menuTitle): \(before.menuTitle) → \(after?.menuTitle ?? "unknown").")
+                        if let after, after != expected, after.menuTitle != orientation.uiValue {
+                            let message = "Unexpected orientation after \(direction.menuTitle): expected \(expected.menuTitle), read \(after.menuTitle); no further rotations or screenshots were attempted."
+                            stopReason = message
+                            throw ToolError(message)
+                        }
                     }
                     result.observations.deviceOrientationSource = "Device Hub > Device > Orientation menu checkmark"
-                    guard result.observations.guiOrientationBeforeCapture?.menuTitle == orientation.uiValue else {
+                    if let actual = result.observations.guiOrientationBeforeCapture, actual.menuTitle != orientation.uiValue {
                         let observed = result.observations.guiOrientationBeforeCapture?.menuTitle ?? "unknown"
                         let message = "Could not establish requested orientation \(orientation.uiValue) (readback: \(observed)); no screenshot was taken for this condition."
                         stopReason = message
                         throw ToolError(message)
                     }
-                    displays = try simulator.displays(device)
-                    result.messages.append("Orientation was requested by name, then corrected with at most three right rotations if GUI readback differed. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.")
+                    result.messages.append("Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.")
+                }
+                let displays = result.requested.isCurrent ? result.observations.beforeDisplays : try simulator.displays(device)
+                if let orientation = result.requested.orientation {
                     if !displays.allSatisfy({ $0.uiOrientation == orientation.uiValue }) {
                         result.messages.append("simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations.")
                     }
@@ -97,8 +120,7 @@ final class CaptureEngine {
                     result.observations.activeDisplayID = displays[0].id
                     result.observations.displaySelectionReason = "Only one built-in display was enumerated. No inference from image content or power state was made."
                 } else {
-                    result.observations.displaySelectionReason = "Multiple built-in displays were enumerated; active display is unverified. All built-in displays are saved."
-                    result.messages.append("Active display unverified; all built-in displays are retained without selecting by brightness or fixed screen ID.")
+                    result.observations.displaySelectionReason = "All enumerated built-in displays are saved."
                 }
                 for display in displays {
                     try cancellation.check()
@@ -113,18 +135,18 @@ final class CaptureEngine {
                     manifest.results[index] = result
                     try store.save(manifest)
                 }
-                if usesGUI {
-                    do { try controller.checkTarget(device) }
-                    catch { stopReason = "Target identity changed during capture: \(error)"; throw error }
-                }
                 if result.requested.orientation != nil {
+                    // readOrientation validates the target as part of the same operation.
                     do { result.observations.guiOrientationAfterCapture = try controller.readOrientation(device) }
                     catch { stopReason = "GUI orientation readback failed after capture: \(error)"; throw error }
                     if result.observations.guiOrientationBeforeCapture == result.observations.guiOrientationAfterCapture {
                         result.observations.observedDeviceOrientation = result.observations.guiOrientationAfterCapture
                     } else {
-                        result.messages.append("Device Hub orientation selection changed during capture; orientation is unverified.")
+                        result.messages.append("Device Hub orientation selection changed during capture.")
                     }
+                } else if usesGUI {
+                    do { try controller.checkTarget(device) }
+                    catch { stopReason = "Target identity changed during capture: \(error)"; throw error }
                 }
                 let finalDisplays = try simulator.displays(device)
                 if finalDisplays != displays {
@@ -138,16 +160,18 @@ final class CaptureEngine {
                 if cancellation.cancelled { stopReason = "Interrupted; remaining conditions were not attempted." }
             }
             result.outcome = Assessment.evaluate(result.requested, observations: result.observations, imageCount: result.images.count, failed: operationFailed)
+            previousPosture = result.outcome == .captured ? result.requested.posture : nil
             result.progress = .finished
             manifest.results[index] = result
             try store.save(manifest)
-            print("\(index + 1)/\(conditions.count) \(result.requested.title): \(result.outcome.rawValue) (\(result.images.count) images)")
+            let elapsed = String(format: "%.1f", ProcessInfo.processInfo.systemUptime - started)
+            print("\(index + 1)/\(conditions.count) \(result.requested.title): \(result.outcome.rawValue) (\(result.images.count) images, \(elapsed)s)")
             if stopReason != nil { break }
         }
         if let stopReason { manifest.messages.append(stopReason) }
         manifest.complete = manifest.results.allSatisfy { $0.progress == .finished }
         manifest.finishedAt = timestamp()
         try store.save(manifest)
-        return manifest.complete && manifest.results.allSatisfy { $0.outcome == .verified } ? 0 : 1
+        return manifest.complete && manifest.results.allSatisfy { $0.outcome == .captured } ? 0 : 1
     }
 }

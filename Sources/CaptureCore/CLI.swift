@@ -1,7 +1,7 @@
 import Foundation
 
 public enum CLI {
-    static let version = "0.1.1"
+    static let version = "0.1.2"
     public static let help = """
     posecap — Capture iOS Simulator screenshots.
 
@@ -39,7 +39,7 @@ public enum CLI {
             Requires a booted Simulator; select one if several are booted.
             --current cannot be combined with posture or orientation filters.
             GUI changes require Device Hub 27.1 and Accessibility/Automation access.
-            Final posture/orientation is left in place. Unverified captures exit 1.
+            Final posture/orientation is left in place. Completed captures exit 0.
             """
         case .report:
             return """
@@ -106,7 +106,7 @@ public enum CLI {
                 return 1
             }
             print("Saved: \(store.directory.appendingPathComponent("manifest.json").path)")
-            if code != 0 { error("Capture contains unverified, mismatched, failed, or unattempted conditions. See the manifest or report.") }
+            if code != 0 { error("Capture contains mismatched, failed, or unattempted conditions. See the manifest or report.") }
             return code
         } catch {
             Self.error(String(describing: error))

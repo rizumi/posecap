@@ -6,9 +6,10 @@ protocol DeviceControlling {
     func prepare(_ device: Device, conditions: [Condition]) throws
     func checkTarget(_ device: Device) throws
     func click(_ help: String, device: Device) throws
-    func setOrientation(_ orientation: Orientation, device: Device) throws
+    // Returns false when the requested menu item is already selected.
+    func setOrientation(_ orientation: Orientation, device: Device) throws -> Bool
     func readOrientation(_ device: Device) throws -> DeviceOrientation?
-    func rotateRight(_ device: Device) throws
+    func rotate(_ direction: RotationDirection, device: Device) throws
 }
 
 final class DeviceHubController: DeviceControlling {
@@ -33,7 +34,9 @@ final class DeviceHubController: DeviceControlling {
             try call(device, operation: "probe", control: help, expected: "control-confirmed")
         }
         if conditions.contains(where: { $0.orientation != nil }) {
-            try call(device, operation: "probe", control: "Rotate Right", expected: "control-confirmed")
+            for direction in RotationDirection.allCases {
+                try call(device, operation: "probe-rotation", control: direction.menuTitle, expected: "control-confirmed")
+            }
         }
         for title in Set(conditions.compactMap { $0.orientation?.uiValue }).sorted() {
             try call(device, operation: "probe-orientation", control: title, expected: "control-confirmed")
@@ -62,14 +65,19 @@ final class DeviceHubController: DeviceControlling {
         try call(device, operation: "click", control: help, expected: "dispatched")
     }
 
-    func setOrientation(_ orientation: Orientation, device: Device) throws {
+    func setOrientation(_ orientation: Orientation, device: Device) throws -> Bool {
         try validateTargetEnvironment(device)
-        try call(device, operation: "set-orientation", control: orientation.uiValue, expected: "dispatched")
+        let value = try response(device, operation: "set-orientation", control: orientation.uiValue)
+        switch value {
+        case "dispatched": return true
+        case "unchanged": return false
+        default: throw ToolError("Unexpected Device Hub adapter response; stopping GUI operations.")
+        }
     }
 
-    func rotateRight(_ device: Device) throws {
+    func rotate(_ direction: RotationDirection, device: Device) throws {
         try validateTargetEnvironment(device)
-        try call(device, operation: "click", control: "Rotate Right", expected: "dispatched")
+        try call(device, operation: "rotate", control: direction.menuTitle, expected: "dispatched")
     }
 
     func readOrientation(_ device: Device) throws -> DeviceOrientation? {

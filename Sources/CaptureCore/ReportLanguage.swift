@@ -37,6 +37,7 @@ struct ReportText {
         case .running: return self("Interrupted / incomplete", "中断・未完了")
         case .finished:
             switch result.outcome {
+            case .captured: return self("captured", "撮影完了")
             case .verified: return self("verified", "指定条件を確認済み")
             case .unverified: return self("unverified", "確認できていない項目あり")
             case .mismatched: return self("mismatched", "指定条件と不一致")

@@ -71,21 +71,22 @@ final class CoreTests: XCTestCase {
         XCTAssertThrowsError(try DisplayParser.parse(enumeration(ids: ["17"]).replacingOccurrences(of: "Screen ID: 17", with: "Screen ID: 99")))
     }
 
-    func testEvidenceDoesNotPromoteGUIOrRasterToPhysicalState() {
+    func testCaptureSucceedsWithoutReadbackButRejectsKnownMismatch() {
         var evidence = Observations()
         evidence.activeDisplayID = "17"
         evidence.guiTargetMatched = true
         evidence.dispatchedControls = ["Open"]
         evidence.guiPostureSelection = "Open"
         let condition = Condition(posture: .open, orientation: .portrait)
-        XCTAssertEqual(Assessment.evaluate(condition, observations: evidence, imageCount: 1, failed: false), .unverified)
+        XCTAssertEqual(Assessment.evaluate(condition, observations: evidence, imageCount: 1, failed: false), .captured)
+        XCTAssertEqual(Assessment.evaluate(condition, observations: evidence, imageCount: 0, failed: false), .failed)
         evidence.observedPosture = .closed
         XCTAssertEqual(Assessment.evaluate(condition, observations: evidence, imageCount: 1, failed: false), .mismatched)
         evidence.observedPosture = .open
         evidence.observedDeviceOrientation = .portrait
-        XCTAssertEqual(Assessment.evaluate(condition, observations: evidence, imageCount: 1, failed: false), .verified)
+        XCTAssertEqual(Assessment.evaluate(condition, observations: evidence, imageCount: 1, failed: false), .captured)
         XCTAssertEqual(Assessment.evaluate(condition, observations: evidence, imageCount: 1, failed: true), .failed)
-        XCTAssertEqual(Assessment.evaluate(Condition(), observations: Observations(), imageCount: 2, failed: false), .unverified)
+        XCTAssertEqual(Assessment.evaluate(Condition(), observations: Observations(), imageCount: 2, failed: false), .captured)
     }
 
     func testCurrentCaptureSavesBlackPNGWithoutGUI() throws {
@@ -102,16 +103,73 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(controller.checkCount, 0)
     }
 
-    func testMultiDisplayCurrentIsUnverifiedAndSavesBoth() throws {
+    func testMultiDisplayCurrentSucceedsAndSavesBoth() throws {
         let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
         let store = try CaptureStore(root: root.path)
         let runner = FakeRunner(); runner.ids = ["17", "42"]
         let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: FakeController(), cancellation: Cancellation(), settleSeconds: 0)
-        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition()], label: "Home", store: store, environment: [:]), 1)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition()], label: "Home", store: store, environment: [:]), 0)
         let result = try readManifest(store).results[0]
-        XCTAssertEqual(result.outcome, .unverified)
+        XCTAssertEqual(result.outcome, .captured)
         XCTAssertEqual(result.images.map(\.displayID), ["17", "42"])
         XCTAssertNil(result.observations.activeDisplayID)
+        XCTAssertEqual(runner.enumerationCount, 2)
+    }
+
+    func testConsecutiveConditionsReusePostureAndKeepBothDisplays() throws {
+        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = try CaptureStore(root: root.path)
+        let runner = FakeRunner(); runner.ids = ["17", "42"]
+        let controller = FakeController(); controller.orientationReadback = nil
+        let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        let conditions = try Options.parse(["capture"]).conditions(for: device())
+        XCTAssertEqual(try engine.capture(device: device(), conditions: conditions, label: nil, store: store, environment: [:]), 0)
+        let manifest = try readManifest(store)
+        XCTAssertEqual(controller.clickedControls, ["Closed", "Partially Open", "Open"])
+        XCTAssertEqual(manifest.results.map { $0.images.count }, Array(repeating: 2, count: 6))
+        XCTAssertFalse(manifest.results[1].observations.dispatchedControls.contains("Closed"))
+        XCTAssertTrue(manifest.results[1].messages.contains { $0.contains("preceding successful condition") })
+        XCTAssertEqual(runner.enumerationCount, 18)
+    }
+
+    func testPostureIsReappliedAfterFailedCondition() throws {
+        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = try CaptureStore(root: root.path)
+        let runner = FakeRunner(); runner.failScreenshot = 1
+        let controller = FakeController()
+        let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        let condition = Condition(posture: .closed, orientation: .portrait)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [condition, condition], label: nil, store: store, environment: [:]), 1)
+        XCTAssertEqual(controller.clickedControls, ["Closed", "Closed"])
+        XCTAssertEqual(try readManifest(store).results.map(\.outcome), [.failed, .captured])
+    }
+
+    func testAlreadySelectedOrientationIsNotRecordedAsDispatched() throws {
+        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = try CaptureStore(root: root.path)
+        let controller = FakeController(); controller.orientationWasDispatched = false
+        let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .portrait)], label: nil, store: store, environment: [:]), 0)
+        let result = try readManifest(store).results[0]
+        XCTAssertTrue(result.observations.dispatchedControls.isEmpty)
+        XCTAssertEqual(result.observations.observedDeviceOrientation, .portrait)
+        XCTAssertEqual(controller.rotationCount, 0)
+    }
+
+    func testReadbackFailureAfterScreenshotStopsBatchAndRetainsImage() throws {
+        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = try CaptureStore(root: root.path)
+        let runner = FakeRunner()
+        let controller = FakeController()
+        runner.afterScreenshot = { controller.failReadback = true }
+        let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        let condition = Condition(posture: .closed, orientation: .portrait)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [condition, condition], label: nil, store: store, environment: [:]), 1)
+        let manifest = try readManifest(store)
+        XCTAssertEqual(manifest.results.map(\.progress), [.finished, .pending])
+        XCTAssertEqual(manifest.results[0].outcome, .failed)
+        XCTAssertEqual(manifest.results[0].images.count, 1)
+        XCTAssertEqual(controller.clickCount, 1)
     }
 
     func testScreenshotFailureRetainsOtherImagesAndContinuesConditions() throws {
@@ -124,7 +182,7 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(try engine.capture(device: device(), conditions: conditions, label: nil, store: store, environment: [:]), 1)
         let manifest = try readManifest(store)
         XCTAssertTrue(manifest.complete)
-        XCTAssertEqual(manifest.results.map(\.outcome), [.failed, .unverified])
+        XCTAssertEqual(manifest.results.map(\.outcome), [.failed, .captured])
         XCTAssertEqual(manifest.results.map { $0.images.count }, [1, 2])
         XCTAssertEqual(runner.screenshotCount, 4)
     }
@@ -151,60 +209,141 @@ final class CoreTests: XCTestCase {
         let controller = FakeController(); controller.orientationReadback = .landscapeLeft
         let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
         XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .landscape)], label: nil, store: store, environment: [:]), 0)
-        XCTAssertEqual(controller.orientationSetCount, 1)
+        XCTAssertEqual(controller.orientationSetCount, 0)
         XCTAssertEqual(controller.clickCount, 0)
         let result = try readManifest(store).results[0]
-        XCTAssertEqual(result.outcome, .verified)
+        XCTAssertEqual(result.outcome, .captured)
         XCTAssertEqual(result.observations.afterDisplays[0].uiOrientation, "Portrait")
         XCTAssertEqual(result.observations.observedDeviceOrientation, .landscapeLeft)
         XCTAssertNotNil(result.observations.deviceOrientationSource)
     }
 
-    func testUnknownOrUncorrectedOrientationStopsBeforeScreenshot() throws {
+    func testUnknownOrientationCapturesButKnownUncorrectedOrientationStops() throws {
         for readback in [nil, DeviceOrientation.landscapeRight] {
             let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
             let store = try CaptureStore(root: root.path)
             let controller = FakeController(); controller.orientationReadback = readback
             let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
-            XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .landscape)], label: nil, store: store, environment: [:]), 1)
+            XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .landscape)], label: nil, store: store, environment: [:]), readback == nil ? 0 : 1)
             let result = try readManifest(store).results[0]
-            XCTAssertEqual(result.outcome, .failed)
-            XCTAssertEqual(result.images.count, 0)
-            XCTAssertEqual(controller.orientationSetCount, 1)
+            XCTAssertEqual(result.outcome, readback == nil ? .captured : .failed)
+            XCTAssertEqual(result.images.count, readback == nil ? 1 : 0)
+            XCTAssertEqual(controller.orientationSetCount, readback == nil ? 1 : 0)
             XCTAssertEqual(controller.clickCount, 0)
         }
     }
 
-    func testOrientationCorrectionUsesGUIReadbackAndStopsAtMatch() throws {
+    func testShortestRotationsFromEveryPlanarOrientation() throws {
+        let cases: [(DeviceOrientation, Orientation, [RotationDirection], [DeviceOrientation?])] = [
+            (.portrait, .portrait, [], []),
+            (.portrait, .landscape, [.left], [.landscapeLeft]),
+            (.landscapeRight, .portrait, [.left], [.portrait]),
+            (.landscapeRight, .landscape, [.right, .right], [.upsideDown, .landscapeLeft]),
+            (.upsideDown, .portrait, [.right, .right], [.landscapeLeft, .portrait]),
+            (.upsideDown, .landscape, [.right], [.landscapeLeft]),
+            (.landscapeLeft, .portrait, [.right], [.portrait]),
+            (.landscapeLeft, .landscape, [], []),
+        ]
+        for (start, target, directions, readbacks) in cases {
+            let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+            let store = try CaptureStore(root: root.path)
+            let controller = FakeController()
+            controller.orientationReadback = start
+            controller.rotationReadbacks = readbacks
+            let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+            XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: target)], label: nil, store: store, environment: [:]), 0)
+            XCTAssertEqual(controller.rotations, directions)
+            XCTAssertEqual(controller.orientationSetCount, 0)
+            let result = try readManifest(store).results[0]
+            XCTAssertEqual(result.observations.observedDeviceOrientation?.menuTitle, target.uiValue)
+            XCTAssertEqual(result.observations.dispatchedControls, directions.map(\.menuTitle))
+        }
+    }
+
+    func testUnexpectedRotationStopsWithoutCirclingOrCapturing() throws {
         let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
         let store = try CaptureStore(root: root.path)
         let controller = FakeController()
-        controller.orientationReadback = .portrait
-        controller.rotationReadbacks = [.landscapeRight, .upsideDown, .landscapeLeft]
-        let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
-        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .landscape)], label: nil, store: store, environment: [:]), 0)
-        XCTAssertEqual(controller.rotationCount, 3)
-        let result = try readManifest(store).results[0]
-        XCTAssertEqual(result.observations.observedDeviceOrientation, .landscapeLeft)
-        XCTAssertEqual(result.observations.dispatchedControls.filter { $0 == "Rotate Right" }.count, 3)
+        controller.rotationReadbacks = [.landscapeRight]
+        let runner = FakeRunner()
+        let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        let conditions = [Condition(orientation: .landscape), Condition(orientation: .portrait)]
+        XCTAssertEqual(try engine.capture(device: device(), conditions: conditions, label: nil, store: store, environment: [:]), 1)
+        XCTAssertEqual(controller.rotations, [.left])
+        XCTAssertEqual(runner.screenshotCount, 0)
+        XCTAssertEqual(try readManifest(store).results.map(\.progress), [.finished, .pending])
     }
 
-    func testOrientationChangeDuringScreenshotRemainsUnverified() throws {
+    func testPostureChangeReconcilesOrientationBeforeRelativeTurns() throws {
+        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = try CaptureStore(root: root.path)
+        let controller = FakeController(); controller.orientationReadback = .landscapeLeft
+        controller.afterSet = { controller.orientationReadback = .portrait }
+        controller.rotationReadbacks = [.landscapeLeft]
+        let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        let conditions = [Condition(posture: .closed, orientation: .portrait), Condition(posture: .closed, orientation: .landscape)]
+        XCTAssertEqual(try engine.capture(device: device(), conditions: conditions, label: nil, store: store, environment: [:]), 0)
+        XCTAssertEqual(controller.orientationSetCount, 1)
+        XCTAssertEqual(controller.rotations, [.left])
+        let results = try readManifest(store).results
+        XCTAssertEqual(results[0].observations.dispatchedControls, ["Closed", "Orientation: Portrait"])
+        XCTAssertEqual(results[1].observations.dispatchedControls, ["Rotate Left"])
+    }
+
+    func testNamedRequestAfterFoldUsesOneLeftCorrectionForQuarterTurnOffset() throws {
+        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = try CaptureStore(root: root.path)
+        let controller = FakeController(); controller.orientationReadback = .landscapeLeft
+        controller.afterSet = { controller.orientationReadback = .landscapeRight }
+        controller.rotationReadbacks = [.portrait]
+        let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(posture: .open, orientation: .portrait)], label: nil, store: store, environment: [:]), 0)
+        XCTAssertEqual(controller.orientationSetCount, 1)
+        XCTAssertEqual(controller.rotations, [.left])
+        XCTAssertEqual(try readManifest(store).results[0].observations.observedDeviceOrientation, .portrait)
+    }
+
+    func testUnknownReadbackAfterRotationDoesNotTriggerBlindSecondTurn() throws {
+        let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+        let store = try CaptureStore(root: root.path)
+        let controller = FakeController(); controller.orientationReadback = .upsideDown
+        controller.rotationReadbacks = [nil]
+        let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .portrait)], label: nil, store: store, environment: [:]), 0)
+        XCTAssertEqual(controller.rotations, [.right])
+        XCTAssertNil(try readManifest(store).results[0].observations.observedDeviceOrientation)
+    }
+
+    func testNonPlanarOrientationUsesNamedFallbackBeforePlanningRotations() throws {
+        for start in [DeviceOrientation.faceUp, .faceDown] {
+            let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
+            let store = try CaptureStore(root: root.path)
+            let controller = FakeController(); controller.orientationReadback = start
+            controller.afterSet = { controller.orientationReadback = .portrait }
+            controller.rotationReadbacks = [.landscapeLeft]
+            let engine = CaptureEngine(simulator: Simulator(runner: FakeRunner()), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
+            XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .landscape)], label: nil, store: store, environment: [:]), 0)
+            XCTAssertEqual(controller.orientationSetCount, 1)
+            XCTAssertEqual(controller.rotations, [.left])
+        }
+    }
+
+    func testOrientationChangeDuringScreenshotStillCaptures() throws {
         let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
         let store = try CaptureStore(root: root.path)
         let controller = FakeController(); controller.orientationReadback = .portrait
         let runner = FakeRunner()
         runner.afterScreenshot = { controller.orientationReadback = .landscapeRight }
         let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
-        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .portrait)], label: nil, store: store, environment: [:]), 1)
+        XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .portrait)], label: nil, store: store, environment: [:]), 0)
         let result = try readManifest(store).results[0]
         XCTAssertEqual(controller.rotationCount, 0)
-        XCTAssertEqual(result.outcome, .unverified)
+        XCTAssertEqual(result.outcome, .captured)
         XCTAssertNil(result.observations.observedDeviceOrientation)
         XCTAssertEqual(result.images.count, 1)
     }
 
-    func testOrientationCorrectionIsBoundedAndStopsOnUnknownOrTargetLoss() throws {
+    func testOrientationCorrectionIsBoundedAndAllowsUnknownReadback() throws {
         for mode in 0..<3 {
             let root = try temporaryDirectory(); defer { try? FileManager.default.removeItem(at: root) }
             let store = try CaptureStore(root: root.path)
@@ -213,9 +352,9 @@ final class CoreTests: XCTestCase {
             controller.failRotation = mode == 2
             let runner = FakeRunner()
             let engine = CaptureEngine(simulator: Simulator(runner: runner), controller: controller, cancellation: Cancellation(), settleSeconds: 0)
-            XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .landscape)], label: nil, store: store, environment: [:]), 1)
-            XCTAssertEqual(controller.rotationCount, [3, 0, 1][mode])
-            XCTAssertEqual(runner.screenshotCount, 0)
+            XCTAssertEqual(try engine.capture(device: device(), conditions: [Condition(orientation: .landscape)], label: nil, store: store, environment: [:]), mode == 1 ? 0 : 1)
+            XCTAssertEqual(controller.rotationCount, [1, 0, 1][mode])
+            XCTAssertEqual(runner.screenshotCount, mode == 1 ? 1 : 0)
         }
     }
 
@@ -284,7 +423,7 @@ final class CoreTests: XCTestCase {
                              ImageRecord(displayID: "17", path: "inner.png", width: 3, height: 4)]
             XCTAssertEqual(Report.preferredDisplayID(for: result, device: device()), posture == .closed ? "42" : "17")
             XCTAssertNil(result.observations.activeDisplayID)
-            XCTAssertEqual(Assessment.evaluate(result.requested, observations: result.observations, imageCount: 2, failed: false), .unverified)
+            XCTAssertEqual(Assessment.evaluate(result.requested, observations: result.observations, imageCount: 2, failed: false), .captured)
             XCTAssertNil(Report.preferredDisplayID(for: result, device: device(model: "iPhone 18 Pro")))
         }
     }
@@ -328,7 +467,7 @@ final class CoreTests: XCTestCase {
         XCTAssertFalse(html.contains("<details>"))
         _ = try Report.generate(input: root.path, details: true)
         let detailed = try String(contentsOf: output, encoding: .utf8)
-        XCTAssertTrue(detailed.contains("Capture details · unverified"))
+        XCTAssertTrue(detailed.contains("Capture details · captured"))
         XCTAssertFalse(detailed.contains("01-display-17.png"))
         _ = try Report.generate(input: root.path)
         XCTAssertEqual(try Data(contentsOf: store.directory.appendingPathComponent("manifest.json")), original)
@@ -450,10 +589,14 @@ private func enumeration(ids: [String]) -> String {
 private final class FakeRunner: CommandRunning {
     var ids = ["17"]
     var screenshotCount = 0
+    var enumerationCount = 0
     var failScreenshot: Int?
     var afterScreenshot: (() -> Void)?
     func run(_ executable: String, _ arguments: [String], timeout: TimeInterval) throws -> CommandOutput {
-        if arguments.contains("enumerate") { return CommandOutput(stdout: Data(enumeration(ids: ids).utf8), stderr: "") }
+        if arguments.contains("enumerate") {
+            enumerationCount += 1
+            return CommandOutput(stdout: Data(enumeration(ids: ids).utf8), stderr: "")
+        }
         if arguments.contains("screenshot") {
             screenshotCount += 1
             if screenshotCount == failScreenshot { throw ToolError("Synthetic screenshot failure.") }
@@ -476,20 +619,34 @@ private final class FakeController: DeviceControlling {
     var failClick: Int?
     var orientationReadback: DeviceOrientation? = .portrait
     var orientationSetCount = 0
+    var orientationWasDispatched = true
+    var failReadback = false
+    var clickedControls: [String] = []
     var rotationCount = 0
+    var rotations: [RotationDirection] = []
     var rotationReadbacks: [DeviceOrientation?] = []
     var failRotation = false
-    func rotateRight(_ device: Device) throws {
+    var afterSet: (() -> Void)?
+    func rotate(_ direction: RotationDirection, device: Device) throws {
         rotationCount += 1
+        rotations.append(direction)
         if failRotation { throw ToolError("Synthetic rotation target loss.") }
         if !rotationReadbacks.isEmpty { orientationReadback = rotationReadbacks.removeFirst() }
     }
-    func setOrientation(_ orientation: Orientation, device: Device) throws { orientationSetCount += 1 }
-    func readOrientation(_ device: Device) throws -> DeviceOrientation? { orientationReadback }
+    func setOrientation(_ orientation: Orientation, device: Device) throws -> Bool {
+        orientationSetCount += 1
+        afterSet?()
+        return orientationWasDispatched
+    }
+    func readOrientation(_ device: Device) throws -> DeviceOrientation? {
+        if failReadback { throw ToolError("Synthetic readback target loss.") }
+        return orientationReadback
+    }
     func prepare(_ device: Device, conditions: [Condition]) throws { prepareCount += 1 }
     func checkTarget(_ device: Device) throws { checkCount += 1 }
     func click(_ help: String, device: Device) throws {
         clickCount += 1
+        clickedControls.append(help)
         if clickCount == failClick { throw ToolError("Synthetic target identity failure.") }
     }
 }
