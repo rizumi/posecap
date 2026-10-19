@@ -17,7 +17,7 @@ To view the [example report](docs/example), clone the repository and run
 
 ## Requirements
 
-- macOS 26.0 or later and Xcode.
+- An Apple Silicon Mac with macOS 26.0 or later and Xcode. Intel Macs are not supported.
 - A booted iPhone or iPad Simulator with the app screen ready to capture.
 - Device Hub 27.1 from the selected Xcode,
   with its device window and sidebar accessible, plus Accessibility and
@@ -25,7 +25,7 @@ To view the [example report](docs/example), clone the repository and run
 
 Capture requires an interactive desktop; do not interact with Device Hub during capture.
 
-Tested with macOS 26.6.2, Xcode 27.1 RC (27A9275), and Swift 6.4.
+Tested with macOS 26.6.2, Xcode 27.1 (27A9275), and Swift 6.4.
 
 ## Install
 
@@ -34,10 +34,12 @@ Tested with macOS 26.6.2, Xcode 27.1 RC (27A9275), and Swift 6.4.
 With [mise](https://mise.jdx.dev/getting-started.html) installed and activated:
 
 ```sh
-mise use -g github:rizumi/posecap@0.1.4
+mise use -g github:rizumi/posecap
 ```
 
-Release binaries support Apple Silicon Macs (arm64).
+To pin a version for a project instead, run
+`mise use github:rizumi/posecap@<version>` in that project; mise records it in
+the project's `mise.toml`.
 
 ### Build from source
 
