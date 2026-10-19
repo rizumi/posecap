@@ -65,8 +65,7 @@ posecap report --input ./output
 open ./output/index.html
 ```
 
-Without `--output`, each capture creates a UTC timestamp directory under
-`./output` (for example, `20261019T123456Z`; collisions add `-1`, `-2`, etc.).
+Without `--output`, each capture creates a timestamped directory under `./output`.
 
 Specify `--output` to save directly to a reusable directory:
 
@@ -76,16 +75,13 @@ posecap report --input ./screenshots/home
 open ./screenshots/home/index.html
 ```
 
-Images use condition names such as `closed-portrait-display-0.png` or
-`portrait-display-0.png`. Repeating a capture replaces matching images after PNG
-validation and replaces `manifest.json` with the current run. Other files,
-including images from previously selected conditions, remain on disk but are not
-included in a newly generated report. Regenerate the report after recapturing.
-Choose a different output directory to keep history.
+Repeating a capture in the same directory replaces matching images. Other files
+remain, but the regenerated report includes only the latest run in that directory.
+Regenerate the report after recapturing; use a different directory to keep history.
 
-`report --input` accepts either a capture directory containing `manifest.json`
-or a parent directory of captures. If the input itself has a manifest, only that
-capture is reported. Existing timestamp/UUID capture directories remain readable.
+`report --input` accepts a single capture directory or a parent directory to
+combine multiple captures. If the input is itself a capture, only that capture
+is reported.
 
 To capture across iPhone Duo postures and orientations:
 
@@ -106,13 +102,8 @@ posecap capture --model "iPhone Duo" --posture closed --orientation portrait
 When multiple Simulators are booted, select one with `--model` or `--udid`.
 The final posture and orientation are left in place.
 
-Consecutive captures of the same posture reuse it. Orientation changes use the
-shortest left/right rotation sequence from Device Hub readback; an already
-selected orientation is left in place. After a posture change, a differing
-direction is first reconciled with one named orientation request. GUI changes
-wait four seconds for settling.
-For command timings, run `POSECAP_TRACE_TIMING=1 posecap capture ...`;
-each completed condition also prints its elapsed time.
+GUI changes wait four seconds for settling. Each completed condition prints its
+elapsed time; use `POSECAP_TRACE_TIMING=1 posecap capture ...` for command timings.
 
 Reports work offline and can be filtered by screen, posture, and orientation.
 Keep the images and capture directories alongside `index.html` when sharing.
