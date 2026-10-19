@@ -37,7 +37,7 @@ struct ReportCommand: ParsableCommand {
         commandName: "report", abstract: "Generate an HTML report",
         discussion: "Writes index.html in the input directory. Images and manifests are kept.")
 
-    @Option(help: "Directory containing capture runs (required)")
+    @Option(help: "Capture directory or directory containing capture runs (required)")
     var input: String
     @Option(help: "Report heading")
     var title: String?
@@ -78,15 +78,15 @@ struct CaptureCommand: ParsableCommand {
     var model: String?
     @Option(help: "Label in the report")
     var label: String?
-    @Option(help: "Output directory")
-    var output = "./output"
+    @Option(help: "Save directly here, replacing matching files (default: new timestamp directory under ./output)")
+    var output: String?
     @Option(help: "Device posture (iPhone Duo only)")
     var posture: Posture?
     @Option(help: "Device orientation (landscape uses landscape-left)")
     var orientation: Orientation?
 
     mutating func validate() throws {
-        for (value, name) in [(model, "--model"), (label, "--label"), (Optional(output), "--output")] {
+        for (value, name) in [(model, "--model"), (label, "--label"), (output, "--output")] {
             try validateText(value, option: name)
         }
         if let udid {

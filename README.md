@@ -63,6 +63,28 @@ posecap report --input ./output
 open ./output/index.html
 ```
 
+Without `--output`, each capture creates a UTC timestamp directory under
+`./output` (for example, `20261019T123456Z`; collisions add `-1`, `-2`, etc.).
+
+Specify `--output` to save directly to a reusable directory:
+
+```sh
+posecap capture --label Home --output ./screenshots/home
+posecap report --input ./screenshots/home
+open ./screenshots/home/index.html
+```
+
+Images use condition names such as `closed-portrait-display-0.png` or
+`portrait-display-0.png`. Repeating a capture replaces matching images after PNG
+validation and replaces `manifest.json` with the current run. Other files,
+including images from previously selected conditions, remain on disk but are not
+included in a newly generated report. Regenerate the report after recapturing.
+Choose a different output directory to keep history.
+
+`report --input` accepts either a capture directory containing `manifest.json`
+or a parent directory of captures. If the input itself has a manifest, only that
+capture is reported. Existing timestamp/UUID capture directories remain readable.
+
 To capture across iPhone Duo postures and orientations:
 
 ```sh
@@ -91,7 +113,7 @@ For command timings, run `POSECAP_TRACE_TIMING=1 posecap capture ...`;
 each completed condition also prints its elapsed time.
 
 Reports work offline and can be filtered by screen, posture, and orientation.
-Keep the capture directories alongside `index.html` when sharing.
+Keep the images and capture directories alongside `index.html` when sharing.
 Run `posecap --help` for commands or `posecap capture --help` and
 `posecap report --help` for their options.
 
