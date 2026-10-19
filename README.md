@@ -37,8 +37,9 @@ With [mise](https://mise.jdx.dev/getting-started.html) installed and activated:
 mise use -g github:rizumi/posecap
 ```
 
-To pin a version for a project, run `mise use github:rizumi/posecap@0.1.4` in
-that project instead.
+To pin a version for a project instead, run
+`mise use github:rizumi/posecap@<version>` in that project; mise records it in
+the project's `mise.toml`.
 
 ### Build from source
 
