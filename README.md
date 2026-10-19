@@ -31,34 +31,57 @@ or Portrait / Landscape. GitHub displays the HTML source rather than the report.
 `--current` captures without GUI control and does not require Device Hub 27.1
 or those permissions.
 
-## Build and use
+## Install with mise
 
-Build from the repository using the selected Xcode toolchain:
+The release archive supports Apple Silicon Macs (arm64) and includes the
+Device Hub resource bundle. Xcode is still required for Simulator capture.
+Install [mise](https://mise.jdx.dev/getting-started.html) and activate it in your
+shell.
+
+While this repository is private, authenticate first using
+[GitHub CLI](https://cli.github.com/) with an account that can read it:
 
 ```sh
-swift build -c release
-.build/release/posecap --help
+gh auth login --hostname github.com
+mise settings set github.credential_command 'gh auth token --hostname github.com'
 ```
 
-Run the executable from its build directory: it needs the adjacent SwiftPM
-resource bundle. Copying the executable alone is not supported. There are no
-third-party package dependencies. Run `swift test` for automated tests.
+Alternatively, supply `MISE_GITHUB_TOKEN` with access to this repository
+(Contents: read for a fine-grained token). Then install posecap:
+
+```sh
+MISE_USE_VERSIONS_HOST=0 mise use -g github:rizumi/posecap@0.1.0
+posecap --version
+```
+
+`MISE_USE_VERSIONS_HOST=0` queries GitHub directly instead of mise's shared
+version service. To list releases:
+
+```sh
+MISE_USE_VERSIONS_HOST=0 mise ls-remote github:rizumi/posecap
+```
+
+See [mise authentication](https://mise.jdx.dev/dev-tools/github-tokens.html)
+for other authentication options. Releases inherit the repository's visibility;
+this installation method does not register posecap in mise's public registry.
+
+## Use
 
 With exactly one eligible Simulator booted, capture its current screen and
 create a report:
 
 ```sh
-.build/release/posecap devices
-.build/release/posecap capture --current --label Home
-.build/release/posecap report --input ./output
+posecap devices
+posecap capture --current --label Home
+posecap report --input ./output
 open ./output/index.html
 ```
 
 To capture across iPhone Duo postures and orientations, or select one condition:
 
 ```sh
-.build/release/posecap capture --model "iPhone Duo" --label Home
-.build/release/posecap capture --model "iPhone Duo" --posture closed --orientation portrait
+posecap capture --model "iPhone Duo" --label Home
+posecap capture --model "iPhone Duo" --posture closed --orientation portrait
 ```
 
 Select a device with `--model` (an exact device-type model name) or `--udid`
@@ -133,6 +156,23 @@ paths; exclude custom output directories yourself.
 
 See [design decisions](docs/design.md) for verification rules, storage details,
 timeouts, and validation results.
+
+## Build from source
+
+Build from the repository using the selected Xcode toolchain:
+
+```sh
+swift build -c release
+.build/release/posecap --help
+swift test
+```
+
+The executable needs the adjacent SwiftPM resource bundle; copying the executable
+alone is not supported. There are no third-party package dependencies.
+
+Maintainers can run `bash scripts/package-release.sh` on an Apple Silicon Mac
+to build an archive and SHA-256 checksum in `dist/`. The archive keeps
+`bin/posecap` beside `bin/posecap_CaptureCore.bundle` and includes the license.
 
 ## License
 

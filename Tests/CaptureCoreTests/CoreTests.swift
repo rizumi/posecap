@@ -4,6 +4,11 @@ import ImageIO
 @testable import CaptureCore
 
 final class CoreTests: XCTestCase {
+    func testBundledDeviceHubAdapterIsAvailable() throws {
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "DeviceHub", withExtension: "applescript"))
+        XCTAssertTrue(try String(contentsOf: url, encoding: .utf8).contains("on run argv"))
+    }
+
     func testDuplicateRuntimeBuildsAreAllowedButConflictingVersionsFail() throws {
         let json = #"{"devicetypes":[{"identifier":"phone","name":"iPhone Duo","productFamily":"iPhone"}],"runtimes":[{"identifier":"runtime","version":"27.1","buildversion":"example-a"},{"identifier":"runtime","version":"27.1","buildversion":"example-b"}],"devices":{"runtime":[{"udid":"00000000-0000-0000-0000-000000000001","name":"Home","state":"Booted","isAvailable":true,"deviceTypeIdentifier":"phone"}]}}"#
         XCTAssertEqual(try Inventory(data: Data(json.utf8)).devices[0].runtimeVersion, "27.1")

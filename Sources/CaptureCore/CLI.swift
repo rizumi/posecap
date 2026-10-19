@@ -1,6 +1,7 @@
 import Foundation
 
 public enum CLI {
+    static let version = "0.1.0"
     public static let help = """
     posecap — Capture the currently displayed iOS Simulator screen.
 
@@ -44,7 +45,7 @@ public enum CLI {
             let options = try Options.parse(arguments)
             switch options.command {
             case .help: print(help); return 0
-            case .version: print("posecap 0.1.0-dev"); return 0
+            case .version: print("posecap \(version)"); return 0
             case .report:
                 print(try Report.generate(input: options.input!, language: options.language, details: options.details, title: options.title).path)
                 return 0
@@ -64,7 +65,7 @@ public enum CLI {
             let environment = [
                 "os": ProcessInfo.processInfo.operatingSystemVersionString,
                 "xcode": try runner.run("/usr/bin/xcodebuild", ["-version"], timeout: 30).text.trimmingCharacters(in: .whitespacesAndNewlines),
-                "tool": "0.1.0-dev",
+                "tool": version,
             ]
             let store = try CaptureStore(root: options.output)
             print("Capture: \(store.directory.path)")
