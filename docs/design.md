@@ -324,3 +324,34 @@ needed. Without JavaScript the controls stay hidden and all report content
 remains visible. Failed/incomplete status remains attached to the relevant
 screen and conditions when filtering. posecap branding appears only in the
 footer.
+
+## Native GUI timing validation
+
+Live comparison on 2026-10-20 JST: Apple Silicon, macOS 26.6.2 (25G83),
+Xcode 27.1 RC (27A9275), iPhone Duo / iOS 27.1, DayTrip itinerary screen.
+The old GUI at `1867204` and native GUI at `a754323` were release-built and
+alternated three times each. Before every run, the old GUI reset the device to
+open/landscape, the app was restarted with `--itinerary`, and four seconds elapsed.
+That setup was excluded from timing. No builds or tests ran during formal timing.
+`POSECAP_TRACE_TIMING=1` was enabled for both. Each measured CLI invocation included
+preparation, all six conditions, PNG storage and manifest writes, but no report.
+
+| Six-condition capture | Run 1 | Run 2 | Run 3 | Median |
+| --- | ---: | ---: | ---: | ---: |
+| AppleScript GUI | 101.691 s | 100.326 s | 99.330 s | 100.326 s |
+| Native AX GUI | 62.030 s | 60.185 s | 61.290 s | 61.290 s |
+
+Median elapsed time fell 38.9%. Mean time in GUI operations fell from 41.264 to
+2.865 seconds; both versions dispatched the same control sequence and retained
+nine four-second waits (36 seconds). Each version captured 18/18 conditions.
+Manifest conditions, display IDs and PNG dimensions matched. A contact sheet of
+all 36 PNGs was visually checked for expected app content/layout; this is not
+pixel-equality, app-responsiveness or active-display proof. Local raw traces and
+artifacts are retained outside version control in `.local/gui-speed-final` in the
+original workspace. Earlier smoke/provisional runs are excluded from this table.
+
+Fifty automated tests passed, including fake-AX target ambiguity, selection drift,
+foreground loss, malformed/failed readback and messaging-timeout scope coverage.
+Standalone release packaging passed. These tests do not establish compatibility
+with other Device Hub versions. This small live sample is neither a long-term
+reliability study nor a CPU/memory benchmark, and background control is not added.
