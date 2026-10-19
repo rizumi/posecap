@@ -1,7 +1,7 @@
 import Foundation
 
 public enum CLI {
-    static let version = "0.1.0"
+    static let version = "0.1.1"
     public static let help = """
     posecap — Capture iOS Simulator screenshots.
 
