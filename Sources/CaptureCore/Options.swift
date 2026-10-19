@@ -3,6 +3,7 @@ import Foundation
 struct Options {
     enum Command: String { case devices, capture, report, help, version }
     var command: Command
+    var helpTopic: Command?
     var udid: String?
     var model: String?
     var label: String?
@@ -20,7 +21,9 @@ struct Options {
         if first == "--help" || first == "-h" { return Options(command: .help) }
         if first == "--version" { return Options(command: .version) }
         guard let command = Command(rawValue: first), command != .version else { throw ToolError("Unknown command: \(first). Use posecap --help.") }
-        if args.dropFirst().contains("--help") || args.dropFirst().contains("-h") { return Options(command: .help) }
+        if args.dropFirst().contains("--help") || args.dropFirst().contains("-h") {
+            return Options(command: .help, helpTopic: command)
+        }
         var options = Options(command: command)
         var seen = Set<String>()
         var i = 1

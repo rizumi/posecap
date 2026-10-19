@@ -78,7 +78,8 @@ When multiple Simulators are booted, select one with `--model` or `--udid`.
 The final posture and orientation are left in place.
 
 Reports work offline. Keep the capture directories alongside `index.html` when
-sharing. Run `posecap --help` for all commands and options.
+sharing. Run `posecap --help` for commands or `posecap capture --help` and
+`posecap report --help` for their options.
 
 ## Known limitations
 

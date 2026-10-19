@@ -4,6 +4,21 @@ import ImageIO
 @testable import CaptureCore
 
 final class CoreTests: XCTestCase {
+    func testHelpSelectsCommandWithoutRequiringArguments() throws {
+        XCTAssertNil(try Options.parse(["--help"]).helpTopic)
+        for command in [Options.Command.devices, .capture, .report] {
+            for flag in ["--help", "-h"] {
+                let options = try Options.parse([command.rawValue, flag])
+                XCTAssertEqual(options.command, .help)
+                XCTAssertEqual(options.helpTopic, command)
+                XCTAssertTrue(CLI.help(for: options.helpTopic).contains("Usage: posecap " + command.rawValue))
+            }
+        }
+        XCTAssertFalse(CLI.help.contains("--posture"))
+        XCTAssertFalse(CLI.help(for: .report).contains("--posture"))
+        XCTAssertThrowsError(try Options.parse(["report"]))
+    }
+
     func testBundledDeviceHubAdapterIsAvailable() throws {
         let url = try XCTUnwrap(Bundle.module.url(forResource: "DeviceHub", withExtension: "applescript"))
         XCTAssertTrue(try String(contentsOf: url, encoding: .utf8).contains("on run argv"))

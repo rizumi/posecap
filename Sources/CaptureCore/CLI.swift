@@ -3,40 +3,67 @@ import Foundation
 public enum CLI {
     static let version = "0.1.0"
     public static let help = """
-    posecap — Capture the currently displayed iOS Simulator screen.
+    posecap — Capture iOS Simulator screenshots.
 
-    Usage:
-      posecap devices
-      posecap capture [--udid <uuid> | --model <model>] [--output <directory>]
-                      [--label <text>]
-                      [--current | [--posture <posture>] [--orientation <orientation>]]
-      posecap report --input <directory> [--title <app name>] [--language en|ja] [--details]
+    Usage: posecap <command> [options]
 
-    capture defaults to all conditions: six for iPhone Duo, two for other iPhone/iPad.
-    --posture closed|half-open|open and --orientation portrait|landscape may be
-    combined to narrow the matrix. Landscape means landscape-left.
-    --current captures once without changing posture or orientation.
-    --output defaults to ./output. Each invocation creates a new capture directory.
-    --label is optional metadata, never a path or overwrite key.
+    Commands:
+      devices    List Simulators
+      capture    Capture the prepared app screen
+      report     Generate an HTML report
 
-    Only booted Simulators are eligible. No boot, app launch, or navigation is
-    performed. --model matches the exact model name, not a custom display name.
-    Without a selector, exactly one available iPhone/iPad must be booted.
-    GUI changes require Device Hub 27.1 from the selected Xcode, an accessible
-    single window, and macOS Accessibility/Automation permissions.
-    The final posture is left in place. Do not interact with Device Hub during capture.
+    Options:
+      -h, --help    Show help
+      --version     Show version
 
-    Unverified conditions are saved and labeled. Multiple built-in displays are
-    all saved if the active display is unknown. No condition is silently substituted.
-    --language selects the report language (default: en).
-    --details includes capture diagnostics in the report (hidden by default).
-    --title sets the report heading, separately from screen labels.
-    report includes all immediate capture directories and replaces only index.html.
-
-    Exit codes: 0 complete; 1 incomplete/unverified/mismatched/failed capture;
-                2 invalid arguments, selection, report, or setup error.
-    Options: --help, --version
+    Run posecap <command> --help for command options.
     """
+
+    static func help(for command: Options.Command?) -> String {
+        switch command {
+        case .capture:
+            return """
+            Usage: posecap capture [options]
+
+            Options:
+              --model NAME          Exact Simulator model name
+              --udid UUID           Simulator UUID (instead of --model)
+              --current             Capture without GUI changes
+              --posture POSTURE     closed | half-open | open (iPhone Duo only)
+              --orientation DIR     portrait | landscape (landscape-left)
+              --label TEXT          Screen name in the report
+              --output PATH         Output directory (default: ./output)
+              -h, --help            Show help
+
+            Defaults to all postures/orientations: six for Duo, two for other models.
+            Requires a booted Simulator; select one if several are booted.
+            --current cannot be combined with posture or orientation filters.
+            GUI changes require Device Hub 27.1 and Accessibility/Automation access.
+            Final posture/orientation is left in place. Unverified captures exit 1.
+            """
+        case .report:
+            return """
+            Usage: posecap report --input PATH [options]
+
+            Options:
+              --input PATH          Directory containing capture runs (required)
+              --title TEXT          Report heading
+              --language en|ja      Report language (default: en)
+              --details             Include capture diagnostics
+              -h, --help            Show help
+
+            Writes index.html in the input directory. Images and manifests are kept.
+            """
+        case .devices:
+            return """
+            Usage: posecap devices
+
+            List iPhone/iPad Simulators with UUID, model, name, OS, and state.
+            """
+        default:
+            return help
+        }
+    }
 
     public static func run(arguments: [String]) -> Int32 {
         let cancellation = Cancellation()
@@ -44,7 +71,7 @@ public enum CLI {
         do {
             let options = try Options.parse(arguments)
             switch options.command {
-            case .help: print(help); return 0
+            case .help: print(help(for: options.helpTopic)); return 0
             case .version: print("posecap \(version)"); return 0
             case .report:
                 print(try Report.generate(input: options.input!, language: options.language, details: options.details, title: options.title).path)
