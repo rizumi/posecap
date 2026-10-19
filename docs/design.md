@@ -13,6 +13,27 @@ never scene names or unique identifiers. The project uses the MIT license.
 An explicit static HTML report command is included in the MVP scope. Reports
 consume saved capture results independently of Simulator control.
 
+## Source organization
+
+The package has one executable target, `posecap`, with an `@main` entry point
+in `Sources/posecap/Posecap.swift`. Its internal types are tested directly by
+`posecapTests`; a separate library target is not needed for the current CLI.
+
+Directories group related responsibilities within that module:
+
+- `CLI`: argument parsing, validation, command orchestration, and exit codes.
+- `Capture`: capture planning, execution, manifests, and screenshot storage.
+- `Simulator`: device models, discovery, simctl, and Device Hub control.
+- `Report`: offline HTML generation and localization.
+- `Support`: subprocess execution, file checks, and shared errors.
+- `Resources`: the bundled Device Hub AppleScript adapter.
+
+Argument Parser integration stays in `CLI`; capture planning operates on
+device and posture types independently of command-line parsing. Tests follow
+the same responsibility groups, with shared fixtures in `TestSupport`.
+These directories do not impose module boundaries. Introduce another target
+when reuse or enforced dependency boundaries justify an explicit API.
+
 ## Simulator control
 
 Use simctl for Simulator discovery, display enumeration, and PNG
@@ -72,8 +93,13 @@ narrow this matrix. `--current` captures without mutations and excludes filters.
 Half-open refers to the GUI preset, not a measured angle. No restoration occurs.
 
 Only built-in displays are captured. When one is listed it is the sole eligible
-display. Multiple built-in displays are all retained; no active panel is inferred
-from a requested posture, a fixed display ID, power state, or image brightness.
+display. For iPhone Duo with stable, recognized display roles, capture saves only
+the outer display for closed posture and the inner display for half-open/open.
+This selects a target from the requested posture; it does not verify which panel
+is active. Current-state captures, unknown/ambiguous/changing role mappings, and
+other models retain all built-in displays. Display IDs are resolved at runtime;
+image brightness and power state do not drive selection. Both display inventories
+remain in the manifest even when only one image is saved.
 
 Consecutive successful conditions with the same requested posture retain the
 previous posture instead of pressing its button and waiting again. This is
@@ -99,8 +125,8 @@ condition fails without an image. Unknown readback permits capture. Missing
 or changing readback after saving images is recorded without failing the capture;
 a readback operation error fails the condition and stops the batch.
 simctl UI Orientation never drives additional rotations. Fold state has no
-GUI readback; the dispatched posture is assumed. Both iPhone Duo panels
-are saved without requiring active-display readback.
+GUI readback; the dispatched posture is assumed. Selecting a display from that
+posture does not require active-display readback or populate `activeDisplayID`.
 
 Each invocation gets a new UTC timestamp plus UUID capture directory. It contains
 PNGs and a schema-versioned manifest updated after every image. Labels annotate
@@ -211,21 +237,22 @@ Reference implementations provide useful context without being dependencies:
 
 ## Report display defaults
 
-For the observed iPhone Duo configuration, the report presents the outer
-screen for a requested closed posture and the inner screen for half-open/open.
+For the observed iPhone Duo configuration, capture and report share the rule
+that selects the outer screen for closed posture and the inner for half-open/open.
 It resolves runtime display IDs from the recorded `deviceName` roles:
 `primary` (outer) and `primary-1` (inner), as observed with Xcode 27.1.
-These names are a presentation convention for this adapter, not a universal
+These names are an observed convention for this adapter, not a universal
 Simulator API guarantee. Display IDs such as 1 and 3 are never hard-coded.
 
-Both images remain saved, but only the preferred image is included in the
-report. No alternate-display viewer or dual-display mode is implemented. Unknown
+New posture-based captures save only the selected display. Existing captures
+with both images remain readable and show the same preferred image. No
+alternate-display viewer or dual-display mode is implemented. Unknown
 or ambiguous roles, changing role mappings, a missing preferred image, other
 models, or a current-state capture without requested posture fall back to
 showing all saved images. Labels are never parsed to infer posture.
 
-This default does not establish the active display, modify the manifest, or
-change capture exit codes. Capture details, technical captions, and run IDs are
+Report generation does not establish the active display, modify the manifest,
+or change capture exit codes. Capture details, technical captions, and run IDs are
 hidden by default. `report --details` includes diagnostic information, but does
 not enable alternate-display presentation. Failed, mismatched, and incomplete
 captures always keep visible status messages. Original evidence remains in the
@@ -238,15 +265,17 @@ Consider workflows where an app presents content on both iPhone Duo displays
 at once. Determine what runtime evidence identifies such use and how the report
 should offer synchronized comparison, display selection, and explicit overrides.
 The current posture-based default targets single-display review; it must not
-be treated as proof that the other screen is inactive. Keeping both original
-images preserves the material needed for future dual-display presentation.
+be treated as proof that the other screen is inactive. Simultaneous dual-display
+capture and comparison are roadmap items with no committed release timeline.
+Captures that saved only one display cannot recover the other panel later;
+dual-display review will require a new capture with that future mode enabled.
 
 ## Report languages
 
 `report --language en|ja` selects English (default) or Japanese for report
 headings, conditions, statuses, and evidence labels. The HTML `lang` attribute
 follows that selection. Posture names use **Closed / Partially folded / Fully
-open** in both languages, following the HIG figure terminology. All posture
+opened** in both languages. All posture
 cards share the same border style. CLI and manifest values remain `closed`,
 `half-open`, and `open`.
 
@@ -264,9 +293,13 @@ metadata and PNGs remain unchanged.
 `report --title` supplies an app-level heading independently of capture labels.
 Without it the localized heading is “Capture report.” Capture labels identify
 screens; repeated labels share one filter option but retain separate runs.
-The initial view includes every screen and orientation. Native select controls
-filter the saved cards in place. Current captures have an explicit unspecified
-orientation option; no orientation is inferred from image dimensions.
+The initial view includes every screen, posture, and orientation. Native select
+controls combine all three filters on the saved cards. The posture filter appears
+when at least one run requests a posture and includes Closed, Partially folded,
+and Fully opened. Mixed reports include a Current / unspecified posture option;
+current captures also have an unspecified orientation option. Unrequested cards
+carry the same posture and orientation fields as captured cards. No posture or
+orientation is inferred from image dimensions.
 
 Filtering uses a fixed embedded script authorized by its SHA-256 CSP hash.
 Labels and titles are HTML-escaped and never interpolated into JavaScript.

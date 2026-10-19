@@ -106,9 +106,12 @@ final class CaptureEngine {
                     result.messages.append("Orientation used the shortest left/right rotation sequence from GUI readback (at most two turns). One named request reconciles a differing direction after a posture change or unknown/non-planar readback. Menu readback describes Simulator orientation, not application rotation or independent motion-sensor state.")
                 }
                 let displays = result.requested.isCurrent ? result.observations.beforeDisplays : try simulator.displays(device)
+                let preferredDisplay = DisplaySelection.preferredDisplay(device: device, posture: result.requested.posture,
+                                                                         displays: displays, before: result.observations.beforeDisplays)
+                let captureDisplays = preferredDisplay.map { [$0] } ?? displays
                 if let orientation = result.requested.orientation {
-                    if !displays.allSatisfy({ $0.uiOrientation == orientation.uiValue }) {
-                        result.messages.append("simctl UI Orientation differs from the requested direction on one or more displays. The application may restrict rotation; display UI orientation does not drive additional rotations.")
+                    if !captureDisplays.allSatisfy({ $0.uiOrientation == orientation.uiValue }) {
+                        result.messages.append("simctl UI Orientation differs from the requested direction on one or more selected displays. The application may restrict rotation; display UI orientation does not drive additional rotations.")
                     }
                 }
                 if usesGUI {
@@ -119,10 +122,13 @@ final class CaptureEngine {
                 if displays.count == 1 {
                     result.observations.activeDisplayID = displays[0].id
                     result.observations.displaySelectionReason = "Only one built-in display was enumerated. No inference from image content or power state was made."
+                } else if let preferredDisplay {
+                    let role = result.requested.posture == .closed ? "outer" : "inner"
+                    result.observations.displaySelectionReason = "Only the \(role) display (\(preferredDisplay.id)) is saved, selected from the requested posture and enumerated display roles. This does not verify the active display."
                 } else {
-                    result.observations.displaySelectionReason = "All enumerated built-in displays are saved."
+                    result.observations.displaySelectionReason = "No unambiguous posture-based display selection was available; all enumerated built-in displays are saved."
                 }
-                for display in displays {
+                for display in captureDisplays {
                     try cancellation.check()
                     do {
                         let image = try store.image(index: index, display: display) { try simulator.screenshot(device, display: display, to: $0) }

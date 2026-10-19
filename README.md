@@ -1,12 +1,14 @@
 # posecap
 
+> [!WARNING]
+> **Experimental** — posecap is under active development and has known limitations.
+> Review the [known limitations](#known-limitations) before use.
+
 Capture iOS Simulator screenshots across device postures and orientations,
 then compare them in an offline HTML report.
 
 Open the app screen you want to capture; posecap handles the screenshots and
 report. It does not build, install, or navigate apps.
-
-**Experimental.** See [known limitations](#known-limitations).
 
 [![DayTrip capture report on iPhone Duo](docs/images/daytrip-preview.png)](docs/example/index.html)
 
@@ -68,6 +70,10 @@ To capture across iPhone Duo postures and orientations:
 posecap capture --model "iPhone Duo" --label Home
 ```
 
+For iPhone Duo, capture saves the outer display when closed and the inner
+display when partially folded or fully opened: one image per condition.
+With `--current` or an unknown display mapping, it saves all built-in displays.
+
 Use `--posture` and `--orientation` to select a single condition:
 
 ```sh
@@ -85,18 +91,28 @@ wait four seconds for settling.
 For command timings, run `POSECAP_TRACE_TIMING=1 posecap capture ...`;
 each completed condition also prints its elapsed time.
 
-Reports work offline. Keep the capture directories alongside `index.html` when
-sharing. Run `posecap --help` for commands or `posecap capture --help` and
+Reports work offline and can be filtered by screen, posture, and orientation.
+Keep the capture directories alongside `index.html` when sharing.
+Run `posecap --help` for commands or `posecap capture --help` and
 `posecap report --help` for their options.
 
 ## Known limitations
 
 - Captures succeed when images are saved. Missing posture or active-display
-  readback does not cause an error; all built-in displays are saved.
+  readback does not cause an error.
+- Simultaneous use of both iPhone Duo displays is not supported. The current
+  capture and report workflow targets one display per posture.
 - Orientation changes can fail on iPhone Duo. App rotation and responsiveness
   are not verified.
 - GUI control has only been tested with the Xcode build above and English
   control labels; single-screen iPhone capture has not been verified.
+
+## Roadmap
+
+- [ ] Support apps that use both iPhone Duo displays simultaneously, with explicit
+  display selection and side-by-side comparison in reports.
+
+This is a future direction, with no release timeline yet.
 
 ## Development
 

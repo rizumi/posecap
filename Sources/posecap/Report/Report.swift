@@ -40,6 +40,11 @@ enum Report {
         }.joined()
         let hasCurrent = runs.contains { $0.0.results.contains { $0.requested.isCurrent } }
         let currentOption = hasCurrent ? "<option value=\"current\">\(t("Current / unspecified", "現在の画面・向き未指定"))</option>" : ""
+        let hasPostures = runs.contains { $0.0.results.contains { $0.requested.posture != nil } }
+        let hasUnspecifiedPosture = runs.contains { $0.0.results.contains { $0.requested.posture == nil } }
+        let postureOptions = Posture.allCases.map { "<option value=\"\($0.rawValue)\">\(t.posture($0))</option>" }.joined()
+            + (hasUnspecifiedPosture ? "<option value=\"current\">\(t("Current / unspecified", "現在の画面・姿勢未指定"))</option>" : "")
+        let postureFilter = hasPostures ? "<label for=posture-filter>\(t("Posture", "姿勢")) <select id=posture-filter><option value=all>\(t("All", "すべて"))</option>\(postureOptions)</select></label>" : ""
         let scriptHash = Data(SHA256.hash(data: Data(filterScript.utf8))).base64EncodedString()
         var sections = ""
         for (manifest, directory) in runs {
@@ -60,7 +65,7 @@ enum Report {
                             sections += try cell(result, device: manifest.device, directory: directory, text: t, details: details)
                         } else {
                             let title = t.condition(Condition(posture: posture, orientation: orientation))
-                            sections += "<article data-orientation=\"\(orientation.rawValue)\"><h3>\(escape(title))</h3><p class=muted>\(t("Not requested", "指定なし"))</p></article>"
+                            sections += "<article data-orientation=\"\(orientation.rawValue)\" data-posture=\"\(posture?.rawValue ?? "current")\"><h3>\(escape(title))</h3><p class=muted>\(t("Not requested", "指定なし"))</p></article>"
                         }
                     }
                 }
@@ -74,9 +79,10 @@ enum Report {
         <title>\(escape(heading))</title><style>
         [hidden]{display:none!important}.filters{display:flex;flex-wrap:wrap;gap:1rem;margin:1.5rem 0}.filters label{display:flex;align-items:center;gap:.6rem}select{font:inherit;padding:.4rem .7rem;max-width:100%;border:1px solid #bcc7d1;border-radius:6px;background:white;color:inherit}select:focus-visible{outline:2px solid #087d98;outline-offset:2px}footer{margin:2rem 0;color:#526170;font-size:.8rem}:root{color-scheme:light;font-family:system-ui,sans-serif}*{box-sizing:border-box}body{max-width:1500px;margin:2rem auto;padding:0 2rem;line-height:1.6;background:#f3f5f7;color:#1f2937}h1{margin-bottom:.3rem}h2{margin:0 0 .5rem}h3{margin:0;font-size:1rem}section{margin:2.5rem 0}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}article{background:white;border:1px solid #dce2e8;border-radius:12px;padding:16px;min-width:0}figure{margin:1rem 0}img{width:100%;height:460px;object-fit:contain;background:#e9edf1;border-radius:6px;display:block}figcaption{font-size:.85rem;color:#526170;overflow-wrap:anywhere}code{overflow-wrap:anywhere}.status{font-size:.85rem}.captured,.verified{color:#147d44}.unverified,.muted{color:#526170}.mismatched,.failed{color:#a52222;font-weight:600}li{overflow-wrap:anywhere}details{margin:.7rem 0;font-size:.85rem}summary{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#087d98}.intro{color:#526170}@media(max-width:650px){body{padding:0 1rem}.grid{grid-template-columns:1fr}img{height:380px}}
         </style></head><body><h1>\(escape(heading))</h1>
-        <p class=intro>\(t("Compare layouts by screen and orientation. Click an image for full size.", "画面・向きを選んでレイアウトを比較できます。画像をクリックすると原寸で開きます。"))</p>
+        <p class=intro>\(t("Filter captures to compare layouts. Click an image for full size.", "撮影結果を絞り込んでレイアウトを比較できます。画像をクリックすると原寸で開きます。"))</p>
         <div class=filters hidden>
         <label for=screen-filter>\(t("Screen", "画面")) <select id=screen-filter><option value=all>\(t("All", "すべて"))</option>\(screenOptions)</select></label>
+        \(postureFilter)
         <label for=orientation-filter>\(t("Orientation", "向き")) <select id=orientation-filter><option value=all>\(t("All", "すべて"))</option><option value=portrait>Portrait</option><option value=landscape>Landscape</option>\(currentOption)</select></label>
         </div>
         <p id=filter-empty role=status hidden>\(t("No captures match these filters.", "この条件に該当する撮影結果はありません。"))</p>
@@ -91,13 +97,15 @@ enum Report {
     (() => {
       const screen = document.getElementById('screen-filter');
       const orientation = document.getElementById('orientation-filter');
+      const posture = document.getElementById('posture-filter');
       const sections = [...document.querySelectorAll('section[data-screen]')];
       function update() {
         let visible = 0;
         for (const section of sections) {
           let cards = 0;
           for (const card of section.querySelectorAll('article[data-orientation]')) {
-            card.hidden = orientation.value !== 'all' && card.dataset.orientation !== orientation.value;
+            card.hidden = (orientation.value !== 'all' && card.dataset.orientation !== orientation.value)
+              || (posture && posture.value !== 'all' && card.dataset.posture !== posture.value);
             if (!card.hidden) cards++;
           }
           section.hidden = (screen.value !== 'all' && section.dataset.screen !== screen.value) || cards === 0;
@@ -107,6 +115,7 @@ enum Report {
       }
       screen.addEventListener('change', update);
       orientation.addEventListener('change', update);
+      posture?.addEventListener('change', update);
       document.querySelector('.filters').hidden = false;
       update();
     })();
@@ -116,26 +125,11 @@ enum Report {
         items.isEmpty ? "" : "<ul>" + items.map { "<li>\(escape($0))</li>" }.joined() + "</ul>"
     }
 
-    // A report presentation convention for the observed iPhone Duo display roles.
-    // Never write this preference into activeDisplayID or upgrade capture evidence.
+    // Share capture selection with reports, including older runs that saved both
+    // panels. A missing preferred image must not hide the remaining diagnostics.
     static func preferredDisplayID(for result: CaptureResult, device: Device) -> String? {
-        guard device.isDuo, let posture = result.requested.posture else { return nil }
-        let displays = result.observations.afterDisplays
-        guard displays.count == 2,
-              displays.allSatisfy({ $0.type == "Integrated" }),
-              Set(displays.map(\.id)).count == 2,
-              Set(displays.compactMap(\.deviceName)) == Set(["primary", "primary-1"])
-        else { return nil }
-        // If both inventories exist, role identity must remain stable across capture.
-        let before = result.observations.beforeDisplays
-        if !before.isEmpty {
-            guard before.count == displays.count,
-                  displays.allSatisfy({ after in
-                      before.contains { $0.id == after.id && $0.deviceName == after.deviceName && $0.type == after.type }
-                  }) else { return nil }
-        }
-        let role = posture == .closed ? "primary" : "primary-1"
-        guard let display = displays.first(where: { $0.deviceName == role }),
+        guard let display = DisplaySelection.preferredDisplay(device: device, posture: result.requested.posture,
+                                                              displays: result.observations.afterDisplays, before: result.observations.beforeDisplays),
               result.images.filter({ $0.displayID == display.id }).count == 1
         else { return nil }
         return display.id
@@ -144,7 +138,7 @@ enum Report {
     private static func cell(_ result: CaptureResult, device: Device, directory: URL, text t: ReportText, details: Bool) throws -> String {
         let status = t.status(result)
         let style = result.progress == .finished ? result.outcome.rawValue : "failed"
-        var html = "<article data-orientation=\"\(result.requested.orientation?.rawValue ?? "current")\" data-posture=\"\(escape(result.requested.posture?.rawValue ?? ""))\"><h3>\(escape(t.condition(result.requested)))</h3>"
+        var html = "<article data-orientation=\"\(result.requested.orientation?.rawValue ?? "current")\" data-posture=\"\(result.requested.posture?.rawValue ?? "current")\"><h3>\(escape(t.condition(result.requested)))</h3>"
         if result.progress != .finished || result.outcome == .failed || result.outcome == .mismatched {
             html += "<p class=\"status \(style)\">\(escape(status))</p>"
         }

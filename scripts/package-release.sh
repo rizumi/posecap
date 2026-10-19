@@ -27,15 +27,15 @@ stage="$(mktemp -d "${TMPDIR:-/tmp}/posecap-package.XXXXXX")"
 trap 'rm -rf "$stage"' EXIT
 mkdir -p "$stage/bin"
 cp "$bin_dir/posecap" "$stage/bin/posecap"
-cp -R "$bin_dir/posecap_CaptureCore.bundle" "$stage/bin/"
+cp -R "$bin_dir/posecap_posecap.bundle" "$stage/bin/"
 cp LICENSE "$stage/LICENSE"
 
 # Accept both SwiftPM bundle layouts (native SwiftPM and Xcode build engines).
-resource="$stage/bin/posecap_CaptureCore.bundle/Contents/Resources/DeviceHub.applescript"
+resource="$stage/bin/posecap_posecap.bundle/Contents/Resources/DeviceHub.applescript"
 if [[ ! -f "$resource" ]]; then
-    resource="$stage/bin/posecap_CaptureCore.bundle/DeviceHub.applescript"
+    resource="$stage/bin/posecap_posecap.bundle/DeviceHub.applescript"
 fi
-cmp Sources/CaptureCore/Resources/DeviceHub.applescript "$resource"
+cmp Sources/posecap/Resources/DeviceHub.applescript "$resource"
 "$stage/bin/posecap" --version
 "$stage/bin/posecap" --help > /dev/null
 COPYFILE_DISABLE=1 tar -czf "dist/$archive" -C "$stage" bin LICENSE

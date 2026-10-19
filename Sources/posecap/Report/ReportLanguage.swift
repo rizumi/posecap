@@ -10,7 +10,7 @@ struct ReportText {
         switch value {
         case .closed: return "Closed"
         case .halfOpen: return "Partially folded"
-        case .open: return "Fully open"
+        case .open: return "Fully opened"
         }
     }
     func orientation(_ value: DeviceOrientation?) -> String {
